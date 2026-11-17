@@ -24,6 +24,8 @@ class VideoFrameAnalysis:
     frame_index: int
     analysis: FrameAnalysis
     histogram_distance: float | None
+    channel_mean_delta: tuple[float, float, float] | None
+    mean_luminance_delta: float | None
     shot_change_candidate: bool
 
 
@@ -81,11 +83,22 @@ def iter_analyze_video_frames(
             _histogram_distance(previous_analysis, current)
             if previous_analysis is not None else None
         )
+        channel_delta = None
+        luminance_delta = None
+        if previous_analysis is not None:
+            channel_delta = tuple(
+                current.channels[channel].mean - previous_analysis.channels[channel].mean
+                for channel in ("R", "G", "B")
+            )
+            if current.luminance is not None and previous_analysis.luminance is not None:
+                luminance_delta = current.luminance.mean - previous_analysis.luminance.mean
         yield VideoFrameAnalysis(
             timestamp_seconds=timestamp,
             frame_index=index,
             analysis=current,
             histogram_distance=distance,
+            channel_mean_delta=channel_delta,
+            mean_luminance_delta=luminance_delta,
             shot_change_candidate=(
                 shot_change_threshold is not None
                 and distance is not None
