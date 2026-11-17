@@ -187,3 +187,106 @@ def compare_exposure_regions(
         candidate.exposure_stops_from_gray - reference.exposure_stops_from_gray,
         balance_delta,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class SpatialExposureCell:
+    region: PixelRegion
+    mean_luminance: float
+    exposure_stops_from_gray: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class SpatialExposureMap:
+    columns: int
+    rows: int
+    cells: tuple[SpatialExposureCell, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class NeutralRegionCandidate:
+    region: PixelRegion
+    mean_luminance: float
+    exposure_stops_from_gray: float
+    neutral_spread: float
+    confidence: float
+
+
+def analyze_spatial_exposure(
+    frame: PrecisionFrame,
+    *,
+    luminance_coefficients: tuple[float, float, float],
+    columns: int = 8,
+    rows: int = 8,
+    gray_reference: float = 0.18,
+) -> SpatialExposureMap:
+    """Create a coarse grid of linear-luminance measurements."""
+    if columns <= 0 or rows <= 0 or columns > frame.width or rows > frame.height:
+        raise ExposureAnalysisError("Grid dimensions must be positive and cannot exceed frame dimensions.")
+    if not isfinite(gray_reference) or gray_reference <= 0:
+        raise ExposureAnalysisError("gray_reference must be finite and positive.")
+    cells = []
+    for row in range(rows):
+        y0 = row * frame.height // rows
+        y1 = (row + 1) * frame.height // rows
+        for column in range(columns):
+            x0 = column * frame.width // columns
+            x1 = (column + 1) * frame.width // columns
+            region = PixelRegion(x0, y0, x1 - x0, y1 - y0)
+            _, ys = _luminance_samples(frame, region, luminance_coefficients)
+            mean_y = sum(ys) / len(ys)
+            stops = log2(mean_y / gray_reference) if mean_y > 0 else None
+            cells.append(SpatialExposureCell(region, mean_y, stops))
+    return SpatialExposureMap(columns, rows, tuple(cells))
+
+
+def find_neutral_region_candidates(
+    frame: PrecisionFrame,
+    *,
+    luminance_coefficients: tuple[float, float, float],
+    columns: int = 12,
+    rows: int = 8,
+    gray_reference: float = 0.18,
+    max_gray_deviation_stops: float = 1.0,
+    neutral_tolerance: float = 0.04,
+    minimum_region_pixels: int = 16,
+) -> tuple[NeutralRegionCandidate, ...]:
+    """Rank grid cells that may contain a neutral patch near the gray reference.
+
+    This is a heuristic candidate generator, not gray-card recognition. It cannot
+    distinguish a gray card from a naturally neutral object or confirm illumination.
+    """
+    if not isfinite(max_gray_deviation_stops) or max_gray_deviation_stops < 0:
+        raise ExposureAnalysisError("max_gray_deviation_stops must be finite and non-negative.")
+    if not isfinite(neutral_tolerance) or neutral_tolerance < 0:
+        raise ExposureAnalysisError("neutral_tolerance must be finite and non-negative.")
+    if minimum_region_pixels <= 0:
+        raise ExposureAnalysisError("minimum_region_pixels must be positive.")
+    grid = analyze_spatial_exposure(
+        frame, luminance_coefficients=luminance_coefficients,
+        columns=columns, rows=rows, gray_reference=gray_reference,
+    )
+    candidates = []
+    for cell in grid.cells:
+        if cell.region.width * cell.region.height < minimum_region_pixels:
+            continue
+        measurement = measure_exposure_region(
+            frame, cell.region, luminance_coefficients=luminance_coefficients,
+            gray_reference=gray_reference, neutral_tolerance=neutral_tolerance,
+        )
+        if (not measurement.neutral_candidate
+                or measurement.exposure_stops_from_gray is None
+                or measurement.neutral_spread is None):
+            continue
+        deviation = abs(measurement.exposure_stops_from_gray)
+        if deviation > max_gray_deviation_stops:
+            continue
+        neutral_score = max(0.0, 1.0 - measurement.neutral_spread / max(neutral_tolerance, 1e-12))
+        exposure_score = 1.0 - deviation / max(max_gray_deviation_stops, 1e-12)
+        confidence = max(0.0, min(1.0, neutral_score * exposure_score))
+        candidates.append(NeutralRegionCandidate(
+            cell.region, measurement.mean_luminance,
+            measurement.exposure_stops_from_gray, measurement.neutral_spread,
+            confidence,
+        ))
+    return tuple(sorted(candidates, key=lambda item: item.confidence, reverse=True))
