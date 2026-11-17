@@ -101,3 +101,15 @@ def test_duplicate_profile_ids_are_rejected():
     }
     with pytest.raises(ProfileRegistryError, match="unique"):
         ProfileRegistry([profile, profile])
+
+
+def test_returned_profile_records_do_not_mutate_registry():
+    registry = ProfileRegistry.load()
+    profiles = registry.list_profiles()
+    profiles[0]["camera_models"].append("Injected Model")
+    assert "Injected Model" not in registry.list_profiles()[0]["camera_models"]
+
+
+def test_non_object_profile_is_rejected():
+    with pytest.raises(ProfileRegistryError, match="must be an object"):
+        ProfileRegistry([None])
