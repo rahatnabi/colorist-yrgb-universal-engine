@@ -3,7 +3,7 @@
 ## Requirements
 - Python 3.11 or newer
 - Git
-- FFmpeg/ffprobe for video metadata probing and preview decoding (optional for image-only development)
+- FFmpeg/ffprobe for video metadata probing and preview decoding
 - macOS, Linux, and Windows are intended targets; platform-specific behavior must be tested.
 
 ## Create an environment
@@ -14,7 +14,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev,images]"
 ```
 
-For the optional OpenImageIO float32 image decoder:
+For the optional OpenImageIO float32 image decoder and float32 video decoder:
 ```bash
 python -m pip install -e ".[high-precision]"
 ```
@@ -23,12 +23,7 @@ For the optional LibRaw-backed RAW still decoder:
 ```bash
 python -m pip install -e ".[raw]"
 ```
-OpenImageIO and rawpy wheels/plugins vary by platform. Confirm installed format support with your actual EXR/DPX/TIFF/RAW test assets.
-
-Windows PowerShell activation:
-```powershell
-.venv\Scripts\Activate.ps1
-```
+OpenImageIO and rawpy wheels/plugins vary by platform. Confirm installed format support with actual test assets. FFmpeg must include the `gbrpf32le` pixel format for the high-precision video adapter.
 
 ## Run tests
 ```bash
@@ -46,14 +41,10 @@ This reports discoverable optional tools. It does not mean all formats are suppo
 yrgb-probe probe "/path/to/your/clip.mov"
 yrgb-probe probe "/path/to/your/still.dng"
 ```
-The original shorthand `yrgb-probe FILE` remains available. Install FFmpeg so ffprobe and ffmpeg are on PATH.
 
 ## Current limitations
-- Image signatures do not fully validate/decode every format.
 - Pillow preview decoding is 8-bit RGB and is not a production RAW/high-bit-depth decoder.
-- OpenImageIO float32 decode is an initial adapter; source colorimetry/value-domain validation remains required.
-- LibRaw output is demosaiced camera-native RGB, not untouched sensor mosaic; camera support depends on LibRaw.
-- Precision-preserving video decode is not yet implemented.
-- Video behavior depends on the local FFmpeg build and enabled codecs.
-- Camera Log/gamut is not inferred from filenames.
-- LUT parsing, color transforms, grading, scopes, and export are later milestones.
+- OpenImageIO and LibRaw adapters are initial decode paths; source colorimetry and numerical behavior require reference validation.
+- The FFmpeg float32 adapter is a candidate path, not a verified scene-linear or DWG transform.
+- Camera Log/gamut is never inferred from filenames.
+- LUT parsing, color transforms, grading, scopes, and export remain later milestones.
