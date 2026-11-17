@@ -15,5 +15,5 @@ def test_raw_decoder_reports_missing_optional_dependency(tmp_path):
     raw_file = tmp_path / "placeholder.dng"
     raw_file.write_bytes(b"not a real DNG")
     with patch.dict("sys.modules", {"rawpy": None}):
-        with pytest.raises(HighPrecisionDecodeError, match="raw extra"):
+        with pytest.raises(HighPrecisionDecodeError, match="Install the"):
             decode_raw_camera_rgb(raw_file)
