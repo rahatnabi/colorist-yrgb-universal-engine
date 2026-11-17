@@ -18,7 +18,12 @@ For the optional OpenImageIO float32 image decoder:
 ```bash
 python -m pip install -e ".[high-precision]"
 ```
-OpenImageIO wheels/plugins vary by platform. Confirm installed format support with your actual EXR/DPX/TIFF test assets.
+
+For the optional LibRaw-backed RAW still decoder:
+```bash
+python -m pip install -e ".[raw]"
+```
+OpenImageIO and rawpy wheels/plugins vary by platform. Confirm installed format support with your actual EXR/DPX/TIFF/RAW test assets.
 
 Windows PowerShell activation:
 ```powershell
@@ -47,7 +52,8 @@ The original shorthand `yrgb-probe FILE` remains available. Install FFmpeg so ff
 - Image signatures do not fully validate/decode every format.
 - Pillow preview decoding is 8-bit RGB and is not a production RAW/high-bit-depth decoder.
 - OpenImageIO float32 decode is an initial adapter; source colorimetry/value-domain validation remains required.
-- LibRaw and precision-preserving video adapters are not yet implemented.
+- LibRaw output is demosaiced camera-native RGB, not untouched sensor mosaic; camera support depends on LibRaw.
+- Precision-preserving video decode is not yet implemented.
 - Video behavior depends on the local FFmpeg build and enabled codecs.
 - Camera Log/gamut is not inferred from filenames.
 - LUT parsing, color transforms, grading, scopes, and export are later milestones.
