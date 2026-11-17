@@ -59,7 +59,7 @@ class LuminanceStatistics:
 class FrameAnalysis:
     channels: dict[str, ChannelStatistics]
     histograms: dict[str, Histogram]
-    waveform: ScopeRaster
+    waveform: ScopeRaster | None
     rgb_parade: dict[str, ScopeRaster]
     luminance: LuminanceStatistics | None
     clipping: dict[str, int] | None
@@ -99,7 +99,7 @@ def _histogram(values: Sequence[float], bins: int, minimum: float,
 
 
 def _scope(values: Sequence[float], width: int, height: int,
-           minimum: float, maximum: float) -> ScopeRaster:
+           minimum: float, maximum: float, source_width: int) -> ScopeRaster:
     counts = [[0] * height for _ in range(width)]
     underflow = overflow = 0
     span = maximum - minimum
@@ -109,7 +109,8 @@ def _scope(values: Sequence[float], width: int, height: int,
         elif value > maximum:
             overflow += 1
         else:
-            x = min(width - 1, pixel_index % width)
+            source_x = pixel_index % source_width
+            x = min(width - 1, int(source_x / source_width * width))
             y = min(height - 1, int((value - minimum) / span * height))
             counts[x][height - 1 - y] += 1
     return ScopeRaster(minimum, maximum, width, height,
@@ -128,6 +129,7 @@ def analyze_frame(
     gray_reference: float = 0.18,
     clipping_thresholds: tuple[float, float] | None = None,
     vectorscope_coefficients: tuple[float, float, float] | None = None,
+    waveform_coefficients: tuple[float, float, float] | None = None,
     max_vectorscope_points: int = 100_000,
 ) -> FrameAnalysis:
     """Analyze one decoded image or video frame without implicit color transforms.
@@ -158,15 +160,23 @@ def analyze_frame(
         name: _histogram(channel, histogram_bins, low, high)
         for name, channel in values.items()
     }
-    waveform_values = [
-        sum(values[name][i] for name in ("R", "G", "B")) / 3.0
-        for i in range(frame.width * frame.height)
-    ]
-    waveform = _scope(waveform_values, scope_width, scope_height, low, high)
     parade = {
-        name: _scope(channel, scope_width, scope_height, low, high)
+        name: _scope(channel, scope_width, scope_height, low, high, frame.width)
         for name, channel in values.items()
     }
+
+    waveform = None
+    if waveform_coefficients is not None:
+        kr_w, kg_w, kb_w = waveform_coefficients
+        if min(kr_w, kg_w, kb_w) < 0 or abs(kr_w + kg_w + kb_w - 1.0) > 1e-6:
+            raise FrameAnalysisError("Waveform coefficients must be non-negative and sum to 1.")
+        waveform_values = [
+            kr_w * values["R"][i] + kg_w * values["G"][i] + kb_w * values["B"][i]
+            for i in range(frame.width * frame.height)
+        ]
+        waveform = _scope(
+            waveform_values, scope_width, scope_height, low, high, frame.width
+        )
 
     luminance = None
     if luminance_coefficients is not None:
@@ -205,7 +215,7 @@ def analyze_frame(
         if min(kr, kg, kb) < 0 or abs(kr + kg + kb - 1.0) > 1e-6:
             raise FrameAnalysisError("Vectorscope luma coefficients must be non-negative and sum to 1.")
         cb_scale, cr_scale = 2.0 * (1.0 - kb), 2.0 * (1.0 - kr)
-        stride = max(1, (frame.width * frame.height + max_vectorscope_points - 1)
+            stride = max(1, (frame.width * frame.height + max_vectorscope_points - 1)
                      // max_vectorscope_points)
         points = []
         for i in range(0, frame.width * frame.height, stride):
