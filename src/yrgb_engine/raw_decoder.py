@@ -36,7 +36,7 @@ def decode_raw_camera_rgb(file_path: str | Path) -> PrecisionFrame:
                 user_wb=(1.0, 1.0, 1.0, 1.0),
             )
             camera = str(getattr(raw, "camera_model", "") or "unknown")
-            make = str(getattr(raw, " camera", "") or "unknown")
+            make = str(getattr(raw, "camera_make", "") or "unknown")
             black_level = getattr(raw, "black_level_per_channel", None)
             white_level = getattr(raw, "white_level", None)
 
