@@ -190,7 +190,7 @@ def analyze_frame(
             raise FrameAnalysisError("Luminance coefficients must be non-negative and sum to 1.")
         ys = [
             kr * values["R"][i] + kg * values["G"][i] + kb * values["B"][i]
-            for i in range(len(waveform_values))
+            for i in range(frame.width * frame.height)
         ]
         ystats = _statistics(ys)
         ymean = ystats.mean
@@ -214,8 +214,10 @@ def analyze_frame(
         kr, kg, kb = vectorscope_coefficients
         if min(kr, kg, kb) < 0 or abs(kr + kg + kb - 1.0) > 1e-6:
             raise FrameAnalysisError("Vectorscope luma coefficients must be non-negative and sum to 1.")
+        if kb >= 1.0 or kr >= 1.0:
+            raise FrameAnalysisError("Vectorscope coefficients require non-zero Cb and Cr scales.")
         cb_scale, cr_scale = 2.0 * (1.0 - kb), 2.0 * (1.0 - kr)
-            stride = max(1, (frame.width * frame.height + max_vectorscope_points - 1)
+        stride = max(1, (frame.width * frame.height + max_vectorscope_points - 1)
                      // max_vectorscope_points)
         points = []
         for i in range(0, frame.width * frame.height, stride):
