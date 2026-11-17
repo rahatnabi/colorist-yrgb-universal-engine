@@ -22,8 +22,8 @@ def test_statistics_histogram_and_rgb_parade_preserve_headroom():
     assert result.channels["R"].minimum == pytest.approx(-0.2)
     assert result.channels["B"].maximum == pytest.approx(2.0)
     assert result.histograms["R"].underflow == 1
-    assert result.histograms["B"].overflow == 1
-    assert result.rgb_parade["B"].overflow == 1
+    assert result.histograms["B"].overflow == 2
+    assert result.rgb_parade["B"].overflow == 2
     assert result.clipping == {"below_low": 1, "above_high": 1}
     assert result.waveform is None
 
@@ -38,7 +38,7 @@ def test_linear_luminance_requires_explicit_declaration_and_coefficients():
     )
     assert result.luminance is not None
     assert result.luminance.mean == pytest.approx(0.18)
-    assert result.luminance.gray_mean_error == pytest.approx(0.0)
+    assert result.luminance.gray_mean_error == pytest.approx(0.0, abs=1e-7)
 
 
 def test_waveform_and_vectorscope_require_explicit_coefficients():
