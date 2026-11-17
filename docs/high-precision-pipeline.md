@@ -17,13 +17,18 @@ The optional `decode_oiio_float` adapter requests float32 pixels from OpenImageI
 
 Requesting float32 does not prove that returned values are scene-linear, normalized, or in a particular gamut. The adapter labels the sample domain as uncharacterized and does not infer colorimetry from filenames.
 
+## LibRaw adapter
+
+The optional `decode_raw_camera_rgb` adapter asks LibRaw to demosaic supported RAW stills into 16-bit camera-native RGB with a linear gamma request and no automatic brightness. Values are represented as float32 while retaining the 16-bit output code-value scale; they are not normalized to [0, 1].
+
+This output is **not** the original sensor mosaic. It is a demosaiced camera-native candidate and still requires camera-specific characterization, white-balance policy, and validated transforms before grading. Camera model metadata is recorded when available; a camera Log profile is never guessed from a RAW filename.
+
 ## Image sequences
 
-`decode_oiio_sequence_float` streams numbered sequence frames in index order and yields one `PrecisionFrame` at a time. It rejects missing frame indices by default and verifies that dimensions and channel names remain consistent across the sequence. The caller can opt into gaps when they are intentional.
+`decode_oiio_sequence_float` streams numbered sequence frames in index order and yields one `PrecisionFrame` at a time. It rejects missing frame indices by default and verifies that dimensions and channel names remain consistent across the sequence.
 
 ## Not yet implemented
 
-- LibRaw sensor/RAW decode adapter.
 - Precision-preserving video frame decoder.
 - Color-managed input transforms and OCIO configuration.
 - Reference-image comparisons for every supported format.
