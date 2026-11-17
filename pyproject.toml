@@ -15,6 +15,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.6"]
 images = ["Pillow>=10.0"]
+high-precision = ["OpenImageIO>=2.4", "numpy>=1.26"]
 
 [project.scripts]
 yrgb-probe = "yrgb_engine.cli:main"
