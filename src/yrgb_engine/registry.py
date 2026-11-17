@@ -6,6 +6,7 @@ when its status is verified and a transform_id is declared.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +20,8 @@ class ProfileRegistryError(ValueError):
 
 class ProfileRegistry:
     def __init__(self, profiles: list[dict[str, Any]]) -> None:
-        self._profiles = [dict(item) for item in profiles]
         ids: list[str] = []
-        for index, profile in enumerate(self._profiles):
+        for index, profile in enumerate(profiles):
             if not isinstance(profile, dict):
                 raise ProfileRegistryError(f"Profile at index {index} must be an object.")
             profile_id = profile.get("id")
@@ -47,6 +47,7 @@ class ProfileRegistry:
                 )
         if len(ids) != len(set(ids)):
             raise ProfileRegistryError("Every profile must have a unique, non-empty id.")
+        self._profiles = deepcopy(profiles)
 
     @classmethod
     def load(cls, path: str | Path = DEFAULT_REGISTRY_PATH) -> "ProfileRegistry":
@@ -67,7 +68,7 @@ class ProfileRegistry:
 
     def list_profiles(self) -> list[dict[str, Any]]:
         """Return copies of candidate profile records."""
-        return [dict(profile) for profile in self._profiles]
+        return deepcopy(self._profiles)
 
     def get_by_id(self, profile_id: str) -> dict[str, Any] | None:
         """Find a profile by its stable registry identifier."""
@@ -78,7 +79,7 @@ class ProfileRegistry:
 
     @staticmethod
     def _resolved_record(profile: dict[str, Any]) -> dict[str, Any]:
-        record = dict(profile)
+        record = deepcopy(profile)
         usable = record.get("status") == "verified" and bool(record.get("transform_id"))
         record["usable_for_transform"] = usable
         if not usable:
