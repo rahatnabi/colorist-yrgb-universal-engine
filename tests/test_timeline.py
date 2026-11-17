@@ -24,6 +24,8 @@ def test_timeline_streams_frame_reports_and_detects_histogram_change():
     assert reports[0].histogram_distance is None
     assert reports[1].histogram_distance == pytest.approx(0.0)
     assert reports[1].shot_change_candidate is False
+    assert reports[1].channel_mean_delta == pytest.approx((0.0, 0.0, 0.0))
+    assert reports[2].channel_mean_delta == pytest.approx((1.0, 1.0, 1.0))
     assert reports[2].histogram_distance == pytest.approx(1.0)
     assert reports[2].shot_change_candidate is True
 
