@@ -27,6 +27,8 @@ class PixelRegion:
 @dataclass(frozen=True, slots=True)
 class ExposureRegionMeasurement:
     region: PixelRegion
+    gray_reference: float
+    luminance_coefficients: tuple[float, float, float]
     sample_count: int
     mean_rgb: tuple[float, float, float]
     mean_luminance: float
@@ -36,6 +38,7 @@ class ExposureRegionMeasurement:
     exposure_stops_from_gray: float | None
     channel_balance: tuple[float, float, float] | None
     neutral_spread: float | None
+    neutral_candidate: bool | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,15 +128,17 @@ def measure_exposure_region(
     channel_mean = sum(mean_rgb) / 3.0
     balance = None
     spread = None
+    neutral_candidate = None
     if channel_mean > 0:
-        balance = tuple(value / channel_mean for value in mean_rgb)
-        spread = max(balance) - min(balance)
-        if spread <= neutral_tolerance:
-            balance = tuple(value - 1.0 for value in balance)
+        ratios = tuple(value / channel_mean for value in mean_rgb)
+        spread = max(ratios) - min(ratios)
+        balance = tuple(value - 1.0 for value in ratios)
+        neutral_candidate = spread <= neutral_tolerance
     stops = log2(mean_y / gray_reference) if mean_y > 0 else None
     return ExposureRegionMeasurement(
-        region, len(ys), mean_rgb, mean_y, _percentile(ys, 50),
-        _percentile(ys, 10), _percentile(ys, 90), stops, balance, spread,
+        region, gray_reference, luminance_coefficients, len(ys), mean_rgb,
+        mean_y, _percentile(ys, 50), _percentile(ys, 10), _percentile(ys, 90),
+        stops, balance, spread, neutral_candidate,
     )
 
 
@@ -166,6 +171,9 @@ def compare_exposure_regions(
     candidate: ExposureRegionMeasurement,
 ) -> RegionConsistency:
     """Compare two measurements made with the same gray reference convention."""
+    if (reference.gray_reference != candidate.gray_reference
+            or reference.luminance_coefficients != candidate.luminance_coefficients):
+        raise ExposureAnalysisError("Measurements must use identical gray reference and luminance coefficients.")
     if reference.exposure_stops_from_gray is None or candidate.exposure_stops_from_gray is None:
         raise ExposureAnalysisError("Cannot compare a region with zero mean luminance.")
     if reference.channel_balance is None or candidate.channel_balance is None:
