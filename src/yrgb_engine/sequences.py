@@ -1,8 +1,10 @@
 """Numbered image-sequence discovery for frame-based media workflows."""
 from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
 
 @dataclass(slots=True)
 class ImageSequence:
@@ -28,6 +30,7 @@ class ImageSequence:
                 return path
         raise KeyError(f"Frame index {index} is not present in this sequence.")
 
+
 def _pattern_regex(pattern: str) -> tuple[re.Pattern[str], int]:
     path = Path(pattern)
     name = path.name
@@ -44,6 +47,7 @@ def _pattern_regex(pattern: str) -> tuple[re.Pattern[str], int]:
     replacement = rf"(\d{{{width}}})" if width else r"(\d+)"
     escaped = re.escape(name).replace(re.escape(token), replacement)
     return re.compile(rf"^{escaped}$"), width
+
 
 def discover_image_sequence(pattern: str | Path) -> ImageSequence:
     """Find matching sibling frames and report gaps without decoding them."""
