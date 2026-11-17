@@ -1,5 +1,7 @@
 """Runtime capability discovery for optional media dependencies."""
+
 from __future__ import annotations
+
 import importlib.util
 import shutil
 from dataclasses import asdict, dataclass
