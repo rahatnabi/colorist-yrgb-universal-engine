@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from yrgb_engine.decode import DecodeError, decode_still_preview, decode_video_preview_frame
