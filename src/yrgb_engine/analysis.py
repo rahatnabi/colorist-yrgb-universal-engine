@@ -6,7 +6,6 @@ RGB is linear, Rec.709, or a display-referred signal.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import floor
 from typing import Sequence
 
 from .precision import PrecisionFrame
