@@ -8,7 +8,6 @@ from pathlib import Path
 SIGNATURES: tuple[tuple[bytes, str, str], ...] = (
     (b"\x89PNG\r\n\x1a\n", "image", "png"),
     (b"\xff\xd8\xff", "image", "jpeg"),
-    (b"v/1\x01", "image", "exr"),
     (b"\x76\x2f\x31\x01", "image", "exr"),
     (b"MM\x00*", "image", "tiff"),
     (b"II*\x00", "image", "tiff"),
