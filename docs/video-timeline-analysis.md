@@ -6,7 +6,7 @@ with frames decoded from video or numbered still-image sequences, so the same
 temporal analysis path can be reused by either source.
 
 Each report includes the frame index, timestamp, full per-frame analysis,
-adjacent-frame RGB histogram distance, and an optional shot-change candidate.
+adjacent-frame RGB histogram distance, per-channel mean deltas, an optional linear-light luminance delta, and an optional shot-change candidate.
 The histogram distance is the mean total-variation distance across R, G and B
 histograms, including underflow and overflow buckets. It ranges from 0 (same
 distribution) to 1 (fully disjoint distributions).
@@ -23,6 +23,7 @@ distribution) to 1 (fully disjoint distributions).
 - Histogram comparison operates in the current frame sample domain. It does
   not compare perceptual color difference and does not normalize unknown Log
   encodings into a common working space.
+- RGB mean deltas are sample-domain diagnostics, not exposure stops. Linear-light luminance deltas are available only when the caller explicitly supplies the required linear RGB analysis options.
 - Per-frame exposure interpretation remains governed by
   `analysis.py`: linear-light luminance requires explicit coefficients and an
   explicit linear-RGB declaration.
