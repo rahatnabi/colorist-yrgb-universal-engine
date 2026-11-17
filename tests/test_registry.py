@@ -1,4 +1,6 @@
-from yrgb_engine.registry import ProfileRegistry
+import pytest
+
+from yrgb_engine.registry import ProfileRegistry, ProfileRegistryError
 
 
 def test_registry_loads_candidate_profiles():
@@ -17,7 +19,7 @@ def test_exact_profile_is_not_assumed_verified():
     assert profile["usable_for_transform"] is False
 
 
-def test_wrong_gamut_does_not_resolve():
+def test_wrong_gamut_resolves_only_its_own_candidate():
     registry = ProfileRegistry.load()
     profile = registry.resolve(
         manufacturer="Sony",
@@ -35,3 +37,67 @@ def test_unknown_profile_does_not_guess():
         encoding="Mystery Log",
         gamut=None,
     ) is None
+
+
+def test_camera_model_matching_is_case_insensitive():
+    registry = ProfileRegistry([
+        {
+            "id": "test.camera.log",
+            "manufacturer": "Example",
+            "encoding": "Log",
+            "gamut": "Wide",
+            "camera_models": ["Model X"],
+            "status": "unverified",
+            "transform_id": None,
+        }
+    ])
+    assert registry.resolve(
+        manufacturer="example",
+        encoding="log",
+        gamut="wide",
+        camera_model="model x",
+    ) is not None
+    assert registry.resolve(
+        manufacturer="example",
+        encoding="log",
+        gamut="wide",
+        camera_model="other",
+    ) is None
+
+
+def test_verified_status_requires_transform_id():
+    registry = ProfileRegistry([
+        {
+            "id": "test.no.transform",
+            "manufacturer": "Example",
+            "encoding": "Log",
+            "gamut": "Wide",
+            "camera_models": [],
+            "status": "verified",
+            "transform_id": None,
+        }
+    ])
+    assert registry.get_by_id("test.no.transform")["usable_for_transform"] is False
+
+
+def test_invalid_profile_status_is_rejected():
+    with pytest.raises(ProfileRegistryError, match="unsupported status"):
+        ProfileRegistry([
+            {
+                "id": "test.bad",
+                "manufacturer": "Example",
+                "encoding": "Log",
+                "status": "magic",
+            }
+        ])
+
+
+def test_duplicate_profile_ids_are_rejected():
+    profile = {
+        "id": "duplicate",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "status": "unverified",
+    }
+    with pytest.raises(ProfileRegistryError, match="unique"):
+        ProfileRegistry([profile, profile])
