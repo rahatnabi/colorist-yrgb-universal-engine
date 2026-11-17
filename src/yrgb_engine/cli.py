@@ -1,6 +1,8 @@
 """Command-line entry point for media inspection and capability reporting."""
+
 import argparse
 import json
+
 from .capabilities import capabilities_as_dict
 from .probe import probe_media
 
