@@ -6,29 +6,31 @@ from .probe import probe_media
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="yrgb-probe", description="Inspect media for COLORIST YRGB.")
-    parser.add_argument("legacy_file", nargs="?", help=argparse.SUPPRESS)
-    subparsers = parser.add_subparsers(dest="command")
-    probe_parser = subparsers.add_parser("probe", help="Inspect one media file")
-    probe_parser.add_argument("file", help="Path to a media file")
-    probe_parser.add_argument("--timeout", type=int, default=20)
-    probe_parser.add_argument("--max-file-gb", type=float, default=100)
-    subparsers.add_parser("capabilities", help="Report optional decoder/tool availability")
+    parser.add_argument("target", nargs="?", help="File path, 'probe', or 'capabilities'")
+    parser.add_argument("file", nargs="?", help="File path when using the probe subcommand")
+    parser.add_argument("--timeout", type=int, default=20)
+    parser.add_argument("--max-file-gb", type=float, default=100)
     return parser
 
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-    if args.command == "capabilities":
+    if args.target == "capabilities" and args.file is None:
         print(json.dumps(capabilities_as_dict(), indent=2, ensure_ascii=False))
         return
-    if args.command == "probe":
-        file_path, timeout = args.file, args.timeout
-        max_bytes = int(args.max_file_gb * 1024**3)
-    elif args.legacy_file:
-        file_path, timeout, max_bytes = args.legacy_file, 20, 100 * 1024**3
+    if args.target == "probe":
+        if not args.file:
+            parser.error("probe requires a file path")
+        file_path = args.file
+    elif args.target and args.file is None:
+        file_path = args.target
     else:
-        parser.error("provide a file path or use the probe/capabilities command")
-    result = probe_media(file_path, timeout_seconds=timeout, max_file_bytes=max_bytes)
+        parser.error("use yrgb-probe FILE, yrgb-probe probe FILE, or yrgb-probe capabilities")
+    result = probe_media(
+        file_path,
+        timeout_seconds=args.timeout,
+        max_file_bytes=int(args.max_file_gb * 1024**3),
+    )
     print(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
