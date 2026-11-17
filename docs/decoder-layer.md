@@ -3,6 +3,7 @@
 ## Current adapters
 - Still images: Pillow converts supported files to RGB24.
 - Video: FFprobe reads first-stream dimensions and color metadata; FFmpeg decodes one selected frame to RGB24.
+- Image sequences: numbered sibling frames can be discovered using printf-style tokens (for example, %04d) or hash tokens (####); missing frame indices are reported.
 - Common output: DecodedFrame carries dimensions, pixel format, bytes, source path, decoder identity, purpose, and source metadata.
 - Capability report: detects FFmpeg, FFprobe, Pillow, rawpy, OpenImageIO, and PyOpenColorIO. Availability does not mean a decoder adapter or full format support exists.
 
