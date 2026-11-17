@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0.0",
+  "registry_status": "initial-candidate-catalogue",
+  "policy": "A profile is not usable for color conversion until its exact transform implementation and reference tests are verified.",
+  "profiles": [
+    {
+      "id": "sony.slog3.sgamut3cine",
+      "manufacturer": "Sony",
+      "camera_models": [],
+      "encoding": "S-Log3",
+      "gamut": "S-Gamut3.Cine",
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Candidate profile. Confirm exact camera model and recording mode."
+    },
+    {
+      "id": "sony.slog3.sgamut3",
+      "manufacturer": "Sony",
+      "camera_models": [],
+      "encoding": "S-Log3",
+      "gamut": "S-Gamut3",
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Do not substitute for S-Gamut3.Cine."
+    },
+    {
+      "id": "arri.logc3.awg3",
+      "manufacturer": "ARRI",
+      "camera_models": [],
+      "encoding": "LogC3",
+      "gamut": "ARRI Wide Gamut 3",
+      "generation": "LogC3/AWG3",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "EI and camera-generation requirements must be represented before verification."
+    },
+    {
+      "id": "arri.logc4.awg4",
+      "manufacturer": "ARRI",
+      "camera_models": [],
+      "encoding": "LogC4",
+      "gamut": "ARRI Wide Gamut 4",
+      "generation": "LogC4/AWG4",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Keep separate from LogC3/AWG3."
+    },
+    {
+      "id": "canon.clog3.cinema_gamut",
+      "manufacturer": "Canon",
+      "camera_models": [],
+      "encoding": "Canon Log 3",
+      "gamut": "Cinema Gamut",
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Camera and firmware compatibility requires validation."
+    },
+    {
+      "id": "red.log3g10.redwidegamutrgb",
+      "manufacturer": "RED",
+      "camera_models": [],
+      "encoding": "Log3G10",
+      "gamut": "REDWideGamutRGB",
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "RED metadata and decode pipeline may affect required settings."
+    },
+    {
+      "id": "blackmagic.film_gen5.bmd_wide_gamut",
+      "manufacturer": "Blackmagic Design",
+      "camera_models": [],
+      "encoding": "Blackmagic Film Gen 5",
+      "gamut": "Blackmagic Wide Gamut",
+      "generation": "Gen 5",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Do not merge with earlier Blackmagic Film generations."
+    },
+    {
+      "id": "panasonic.vlog.vgamut",
+      "manufacturer": "Panasonic",
+      "camera_models": [],
+      "encoding": "V-Log",
+      "gamut": "V-Gamut",
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Camera model and recording mode require validation."
+    },
+    {
+      "id": "fujifilm.flog2.fgamut",
+      "manufacturer": "Fujifilm",
+      "camera_models": [],
+      "encoding": "F-Log2",
+      "gamut": "F-Gamut",
+      "generation": "F-Log2",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Keep distinct from original F-Log."
+    },
+    {
+      "id": "nikon.nlog",
+      "manufacturer": "Nikon",
+      "camera_models": [],
+      "encoding": "N-Log",
+      "gamut": null,
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Gamut and camera-specific requirements must be explicitly resolved."
+    },
+    {
+      "id": "dji.dlog",
+      "manufacturer": "DJI",
+      "camera_models": [],
+      "encoding": "D-Log",
+      "gamut": null,
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Do not conflate with D-Log M."
+    },
+    {
+      "id": "dji.dlogm",
+      "manufacturer": "DJI",
+      "camera_models": [],
+      "encoding": "D-Log M",
+      "gamut": null,
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Separate profile family from D-Log."
+    },
+    {
+      "id": "apple.applelog",
+      "manufacturer": "Apple",
+      "camera_models": [],
+      "encoding": "Apple Log",
+      "gamut": null,
+      "generation": null,
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Device and capture application metadata may be required."
+    }
+  ]
+}
