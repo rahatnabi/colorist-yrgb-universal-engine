@@ -10,9 +10,9 @@ from yrgb_engine.precision import ColorEncoding, PrecisionFrame
 COEFFS = (0.2126, 0.7152, 0.0722)
 
 
-def frame(values, width=2, height=1, *, transfer="linear", validated=True):
+def frame(values, width=None, height=1, *, transfer="linear", validated=True):
     return PrecisionFrame.from_interleaved(
-        width=width, height=height, channel_names=("R", "G", "B"), values=values,
+        width=width or (len(values) // 3), height=height, channel_names=("R", "G", "B"), values=values,
         source_path="synthetic", decoder="test",
         encoding=ColorEncoding(primaries="rec709", transfer=transfer,
                                validated=validated),
@@ -27,6 +27,7 @@ def test_region_at_18_percent_gray_measures_zero_stops_and_neutral():
     assert result.mean_luminance == pytest.approx(0.18)
     assert result.exposure_stops_from_gray == pytest.approx(0.0, abs=1e-6)
     assert result.neutral_spread == pytest.approx(0.0, abs=1e-6)
+    assert result.neutral_candidate is True
 
 
 def test_one_stop_above_gray_and_region_bounds():
