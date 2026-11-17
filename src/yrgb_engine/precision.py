@@ -7,9 +7,9 @@ This model is a buffer contract, not a color transform.
 from __future__ import annotations
 
 from array import array
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from math import isfinite
-from typing import Iterable
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +20,7 @@ class ColorEncoding:
     transfer: str = "unknown"
     matrix: str = "unknown"
     range: str = "unknown"
-    reference: str = "unknown"  # scene_referred | display_referred | unknown
+    reference: str = "unknown"
     source_bit_depth: int | None = None
     chroma_subsampling: str | None = None
     profile_id: str | None = None
@@ -90,7 +90,7 @@ class PrecisionFrame:
         sample_domain: str = "decoder_float_output",
         purpose: str = "grading_candidate",
         metadata: dict[str, str | int | float | bool | None] | None = None,
-    ) -> "PrecisionFrame":
+    ) -> PrecisionFrame:
         """Construct a float32 frame without clamping or applying color transforms."""
         return cls(
             width=width,
