@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "profiles" / "camera_profiles.json"
+DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parent / "data" / "camera_profiles.json"
 
 
 class ProfileRegistryError(ValueError):
