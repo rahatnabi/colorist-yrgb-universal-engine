@@ -28,9 +28,12 @@ are still required before a profile can be promoted to verified.
 - finite values
 - domain minimum/maximum
 
-The parser retains LUT entries and metadata. It does not yet interpolate,
-apply, resize, or blend LUTs. LUT application must be implemented separately
-with explicit interpolation and domain behavior.
+The parser retains LUT entries and metadata. `yrgb_engine.lut.apply_cube_rgb`
+provides a CPU reference implementation with linear 1D interpolation and
+trilinear 3D interpolation. Combined LUTs run the 1D stage before the 3D stage.
+Intensity blends the original RGB input with the final LUT result. Input
+coordinates are clamped to the declared domain; output values are not clamped.
+This is a correctness-oriented CPU reference, not yet a GPU implementation.
 
 ## Current status
 
