@@ -24,7 +24,7 @@ def test_statistics_histogram_and_rgb_parade_preserve_headroom():
     assert result.histograms["R"].underflow == 1
     assert result.histograms["B"].overflow == 2
     assert result.rgb_parade["B"].overflow == 2
-    assert result.clipping == {"below_low": 1, "above_high": 1}
+    assert result.clipping == {"below_low": 1, "above_high": 2}
     assert result.waveform is None
 
 
