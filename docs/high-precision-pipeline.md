@@ -15,7 +15,11 @@ The frame model deliberately:
 
 The optional `decode_oiio_float` adapter requests float32 pixels from OpenImageIO. It is intended as the first high-bit-depth still-image path for formats supported by the user's OpenImageIO build and plugins.
 
-Important: requesting float32 does not by itself prove that the returned values are scene-linear, normalized, or in a particular gamut. The adapter labels the sample domain as uncharacterized and does not infer colorimetry from filenames.
+Requesting float32 does not prove that returned values are scene-linear, normalized, or in a particular gamut. The adapter labels the sample domain as uncharacterized and does not infer colorimetry from filenames.
+
+## Image sequences
+
+`decode_oiio_sequence_float` streams numbered sequence frames in index order and yields one `PrecisionFrame` at a time. It rejects missing frame indices by default and verifies that dimensions and channel names remain consistent across the sequence. The caller can opt into gaps when they are intentional.
 
 ## Not yet implemented
 
