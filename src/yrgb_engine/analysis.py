@@ -216,8 +216,6 @@ def analyze_frame(
             raise FrameAnalysisError("Vectorscope luma coefficients must be non-negative and sum to 1.")
         if kb >= 1.0 or kr >= 1.0:
             raise FrameAnalysisError("Vectorscope coefficients require non-zero Cb and Cr scales.")
-        if kb >= 1.0 or kr >= 1.0:
-            raise FrameAnalysisError("Vectorscope coefficients require non-zero Cb and Cr scales.")
         cb_scale, cr_scale = 2.0 * (1.0 - kb), 2.0 * (1.0 - kr)
         stride = max(1, (frame.width * frame.height + max_vectorscope_points - 1)
                      // max_vectorscope_points)
