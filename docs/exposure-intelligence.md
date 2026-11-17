@@ -47,3 +47,25 @@ must not happen before exact, validated input transforms.
 Automatic gray-card detection, face/skin exposure, spatial highlight masks, semantic
 shot detection, camera matching recommendations, and GPU acceleration remain future
 work. The current implementation is a deterministic CPU measurement foundation.
+
+
+## Spatial exposure map
+
+`analyze_spatial_exposure` divides a validated linear-RGB frame into a configurable
+rectangular grid (8×8 by default). Each cell reports its ROI, mean luminance, and
+stops from the selected gray reference. Cells cover the full frame, including
+non-divisible edge dimensions.
+
+## Neutral-region candidate scan
+
+`find_neutral_region_candidates` ranks grid cells using two explicit heuristics:
+normalized RGB channel spread and proximity to the gray reference in stops. Its
+confidence is a deterministic ranking score, not a calibrated probability. A
+neutral wall, clothing, or other object can score as a candidate; the scanner
+cannot prove that a region is a gray card or that it is correctly illuminated.
+The user must confirm the selected region before treating it as a reference.
+
+The scanner is CPU-based and grid-resolution dependent. Small patches may be missed
+if they fall across cell boundaries; higher grid density improves localization at
+additional computational cost. Automatic segmentation and learned object detection
+are not part of this phase.
