@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "colorist-yrgb-engine"
+version = "0.1.0"
+description = "Media intelligence foundation for the COLORIST YRGB Universal Color Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "License pending" }
+authors = [{ name = "COLORIST YRGB" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+images = ["Pillow>=10.0"]
+high-precision = ["OpenImageIO>=2.4", "numpy>=1.26"]
+raw = ["rawpy>=0.19", "numpy>=1.26"]
+ocio = ["opencolorio>=2.3"]
+
+[project.scripts]
+yrgb-probe = "yrgb_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+yrgb_engine = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
