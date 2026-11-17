@@ -1,4 +1,5 @@
 from array import array
+
 import pytest
 
 from yrgb_engine.precision import ColorEncoding, PrecisionFrame
