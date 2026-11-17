@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Media and generated assets
+media/
+fixtures/private/
+renders/
+proxies/
+*.mov
+*.mp4
+*.mxf
+*.dpx
+*.exr
+*.tif
+*.tiff
+*.dng
