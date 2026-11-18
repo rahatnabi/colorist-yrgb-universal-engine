@@ -65,6 +65,27 @@ been independently validated to the same destination working space. The engine
 does not select, apply, or validate camera transforms. Negative RGB is not
 supported by this Lab diagnostic path and is rejected rather than silently clipped.
 
-Skin-tone tools are not included in this stage. A future skin diagnostic must be
-explicitly scoped as pixel/ROI color analysis, avoid face identity or demographic
-inference, and require a user-selected region rather than guessing from an image.
+## Selected-region skin-tone workflow diagnostics
+
+`yrgb_engine.skin_tone.analyze_selected_region` reports hue, saturation and
+value statistics for an operator-selected ROI in an explicitly named signal
+domain. It does not detect faces, classify skin, infer identity or demographics,
+or impose a universal skin-tone hue target. Hue uses circular statistics, and
+achromatic samples are excluded from hue summaries. This is descriptive grading
+feedback, not a pass/fail judgment or automatic correction.
+
+See [skin-tone-diagnostics.md](skin-tone-diagnostics.md) for the measurement
+contract and limitations.
+
+## Camera profile candidate discovery
+
+`ProfileRegistry.find_candidates` returns possible profile variants without
+choosing among them. If gamut is unspecified, each gamut variant remains a
+separate candidate and the result declares a `gamut_choice` requirement.
+Camera-model-restricted entries similarly declare a `camera_model` requirement.
+Candidate discovery does not promote an unverified record to a usable transform;
+exact resolution and verified transform status remain separate gates.
+
+The initial catalogue is intentionally conservative. Candidate entries must be
+expanded and verified against manufacturer documentation, reference transforms,
+and known-value tests before they can be used in automatic input conversion.
