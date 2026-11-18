@@ -113,3 +113,53 @@ def test_returned_profile_records_do_not_mutate_registry():
 def test_non_object_profile_is_rejected():
     with pytest.raises(ProfileRegistryError, match="must be an object"):
         ProfileRegistry([None])
+
+
+
+def test_candidate_discovery_returns_distinct_gamut_choices_without_guessing():
+    registry = ProfileRegistry.load()
+    candidates = registry.find_candidates(
+        manufacturer="Sony",
+        encoding="S-Log3",
+    )
+    assert {item["gamut"] for item in candidates} == {
+        "S-Gamut3", "S-Gamut3.Cine"
+    }
+    assert all(
+        item["selection_requirements"] == ["gamut_choice"]
+        for item in candidates
+    )
+    assert all(item["usable_for_transform"] is False for item in candidates)
+
+
+def test_candidate_discovery_marks_required_camera_model():
+    registry = ProfileRegistry([
+        {
+            "id": "model-specific",
+            "manufacturer": "Example",
+            "encoding": "Log",
+            "gamut": "Wide",
+            "camera_models": ["Camera A"],
+            "status": "unverified",
+            "transform_id": None,
+        }
+    ])
+    candidates = registry.find_candidates(manufacturer="Example", encoding="Log")
+    assert len(candidates) == 1
+    assert candidates[0]["selection_requirements"] == [
+        "gamut_choice", "camera_model"
+    ]
+    assert registry.find_candidates(
+        manufacturer="Example", encoding="Log", camera_model="Camera B"
+    ) == []
+
+
+def test_candidate_discovery_can_narrow_to_exact_profile_variant():
+    registry = ProfileRegistry.load()
+    candidates = registry.find_candidates(
+        manufacturer="Sony",
+        encoding="S-Log3",
+        gamut="S-Gamut3.Cine",
+    )
+    assert [item["id"] for item in candidates] == ["sony.slog3.sgamut3cine"]
+    assert candidates[0]["selection_requirements"] == []
