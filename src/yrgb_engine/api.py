@@ -51,6 +51,20 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type"],
+        expose_headers=[
+            "X-YRGB-Camera-Transform-Validated",
+            "X-YRGB-Native-Grade",
+            "X-YRGB-Preview-Only",
+            "X-YRGB-Working-Space",
+            "X-YRGB-Export-Scope",
+            "X-YRGB-Sample-Format",
+            "X-YRGB-Sample-Domain",
+            "X-YRGB-Transform-ID",
+            "X-YRGB-Frame-Width",
+            "X-YRGB-Frame-Height",
+            "X-YRGB-Float-Samples-SHA256",
+            "X-YRGB-Clamped",
+        ],
     )
 
     @app.get("/health")
