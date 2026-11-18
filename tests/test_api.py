@@ -59,3 +59,35 @@ def test_probe_accepts_unknown_file_as_unknown_not_supported():
     )
     assert response.status_code == 200
     assert response.json()["probe"]["status"] == "unsupported_or_unknown"
+
+
+def test_analyze_returns_real_sample_domain_histogram_and_parade(monkeypatch):
+    from array import array
+    from yrgb_engine.precision import PrecisionFrame
+
+    def fake_decode(_path):
+        return PrecisionFrame.from_interleaved(
+            width=2,
+            height=1,
+            channel_names=("R", "G", "B"),
+            values=[0.0, 0.5, 1.0, 0.25, 0.5, 0.75],
+            source_path="fixture",
+            decoder="test-decoder",
+            sample_domain="test_encoded_values",
+        )
+
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/analyze",
+        files={"file": ("sample.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["decoder"] == "test-decoder"
+    assert payload["sample_domain"] == "test_encoded_values"
+    assert payload["analysis"]["channels"]["R"]["mean"] == 0.125
+    assert sum(payload["analysis"]["histograms"]["R"]["counts"]) == 2
+    assert payload["analysis"]["waveform"] is None
+    assert payload["analysis"]["luminance"] is None
+    assert payload["analysis"]["vectorscope_points"] is None
