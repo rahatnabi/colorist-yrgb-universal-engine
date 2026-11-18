@@ -980,8 +980,8 @@ def test_native_measurements_uses_same_validated_graded_frame_for_scopes_and_acc
         },
     }])
     source = PrecisionFrame.from_interleaved(
-        width=2, height=2, channel_names=("R", "G", "B"),
-        values=(0.18, 0.18, 0.18) * 4, source_path="fixture", decoder="test",
+        width=4, height=4, channel_names=("R", "G", "B"),
+        values=(0.18, 0.18, 0.18) * 16, source_path="fixture", decoder="test",
         encoding=ColorEncoding(),
     )
     graded = PrecisionFrame.from_interleaved(
@@ -1010,7 +1010,7 @@ def test_native_measurements_uses_same_validated_graded_frame_for_scopes_and_acc
         "/v1/media/native-measurements",
         data={
             "profile_id": profile_id,
-            "roi_x": "0", "roi_y": "0", "roi_width": "2", "roi_height": "2",
+            "roi_x": "0", "roi_y": "0", "roi_width": "4", "roi_height": "4",
             "exposure_stops": "0.0",
         },
         files={"file": ("still.tif", b"fake-image", "image/tiff")},
