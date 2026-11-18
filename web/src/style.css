@@ -301,3 +301,114 @@
 .learning-assessment-note svg{flex:0 0 auto;color:#a9c67c}
 @media(max-width:900px){.learning-layout{grid-template-columns:1fr}.learning-lesson-list{position:static;max-height:280px}.learning-hero{align-items:flex-start;flex-direction:column}.learning-progress-card{width:100%}}
 @media(max-width:560px){.learning-lesson-content{padding:14px}.learning-roi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.learning-history-item{align-items:flex-start;flex-direction:column}.learning-history-item>span{text-align:left}}
+
+/* COLORIST YRGB — widescreen Liquid Glass visual system */
+:root{
+  font-family:"Poppins",sans-serif;
+  color:#edf0e9;
+  background:#090b0c;
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  --glass-surface:rgba(25,29,28,.64);
+  --glass-raised:rgba(35,41,38,.56);
+  --glass-border:rgba(226,238,219,.13);
+  --glass-highlight:rgba(244,250,239,.23);
+  --glass-shadow:0 18px 55px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07);
+  --glass-blur:blur(24px) saturate(155%);
+  --yrgb-accent:#c1d6a1;
+}
+html{min-height:100%;background:#090b0c}
+body{
+  min-width:320px;min-height:100vh;font-family:"Poppins",sans-serif;
+  background:
+    radial-gradient(ellipse at 15% 0%,rgba(125,153,102,.13),transparent 37%),
+    radial-gradient(ellipse at 88% 18%,rgba(104,127,139,.11),transparent 34%),
+    linear-gradient(145deg,#0b0e0e 0%,#111514 52%,#0a0c0d 100%);
+  background-attachment:fixed;
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.15;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:54px 54px;mask-image:linear-gradient(to bottom,black,transparent 80%);
+}
+#root,.app-shell{position:relative;z-index:1;min-height:100vh}
+.app-shell{background:transparent}
+.topbar{
+  height:76px;padding:0 clamp(22px,3vw,52px);
+  background:rgba(13,17,16,.62);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
+  border-bottom:1px solid var(--glass-border);
+  box-shadow:0 8px 30px rgba(0,0,0,.16);
+}
+.brand-mark{width:39px;height:39px;border-radius:13px;border-color:rgba(210,230,192,.36);background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.025));box-shadow:inset 0 1px 0 rgba(255,255,255,.19),0 5px 18px rgba(0,0,0,.2)}
+.brand-name,.brand-sub,.topbar-center,.api-status,.version,h1,h2,h3,h4,p,button,input,select,textarea,label,small,span{font-family:"Poppins",sans-serif}
+.brand-name{font-size:13px;letter-spacing:1.8px}
+.brand-sub{letter-spacing:1.55px}
+.workspace{grid-template-columns:clamp(218px,15vw,270px) minmax(0,1fr);min-height:calc(100vh - 76px)}
+.sidebar{
+  background:rgba(18,22,21,.48);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+  border-right:1px solid var(--glass-border);padding:30px 17px;
+}
+.nav-item{height:43px;border-radius:11px;transition:background .22s ease,border-color .22s ease,transform .22s ease}
+.nav-item:hover{background:rgba(255,255,255,.055);transform:translateX(2px)}
+.nav-item.active{background:linear-gradient(115deg,rgba(180,207,146,.18),rgba(180,207,146,.055));border:1px solid rgba(193,214,161,.23);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 6px 22px rgba(0,0,0,.12)}
+.main-content{max-width:2100px;padding:clamp(26px,2.6vw,48px) clamp(22px,3.2vw,64px) 40px}
+h1{font-size:clamp(25px,1.65vw,34px);font-weight:500;letter-spacing:-1.1px}
+h2{font-weight:500;letter-spacing:-.35px}
+.page-heading{margin-bottom:28px}
+.card,.learning-lesson-list,.learning-lesson-content,.learning-history,.learning-progress-card{
+  background:linear-gradient(145deg,rgba(39,45,41,.72),rgba(19,23,22,.67));
+  border:1px solid var(--glass-border);border-top-color:var(--glass-highlight);
+  border-radius:17px;box-shadow:var(--glass-shadow);
+  backdrop-filter:blur(22px) saturate(145%);-webkit-backdrop-filter:blur(22px) saturate(145%);
+}
+.card{padding:clamp(16px,1.25vw,24px)}
+.learning-lesson-list{background:rgba(24,29,26,.68)}
+.learning-lesson-content{background:rgba(24,29,27,.7)}
+.learning-history{background:rgba(24,29,27,.68)}
+.learning-progress-card{background:linear-gradient(135deg,rgba(67,81,56,.4),rgba(26,33,29,.62))}
+.drop-zone{
+  border:1px dashed rgba(193,214,161,.34);border-radius:15px;
+  background:linear-gradient(135deg,rgba(181,209,148,.09),rgba(255,255,255,.018));
+  transition:border-color .2s ease,background .2s ease,transform .2s ease;
+}
+.drop-zone:hover{border-color:rgba(205,229,174,.75);background:rgba(181,209,148,.1);transform:translateY(-1px)}
+.subtle-tag,.pipeline-pill{border-color:rgba(220,235,208,.17);background:rgba(255,255,255,.035);border-radius:8px}
+.learning-lesson-link{border-radius:10px;transition:all .2s ease}
+.learning-lesson-link.selected{background:linear-gradient(110deg,rgba(178,207,143,.16),rgba(255,255,255,.025));border-color:rgba(193,214,161,.2)}
+.learning-concepts span,.learning-exercise-brief,.learning-assessment-note{border-radius:10px;background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.1)}
+button,.icon-button,.learning-secondary-button,.learning-complete-button,.primary-button{
+  transition:transform .2s ease,background .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+button:not(:disabled):active{transform:scale(.985)}
+.learning-secondary-button,.learning-complete-button{
+  border-radius:10px;background:linear-gradient(135deg,rgba(177,205,142,.14),rgba(255,255,255,.035));
+  border-color:rgba(193,214,161,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+.learning-submit,.primary-button{border-radius:10px}
+.learning-field input,.learning-field select,.learning-field textarea{
+  border-radius:10px;background:rgba(5,8,7,.42);border-color:rgba(225,237,218,.14);
+}
+.learning-field input:focus,.learning-field select:focus,.learning-field textarea:focus{
+  border-color:rgba(193,214,161,.55);box-shadow:0 0 0 3px rgba(193,214,161,.08)
+}
+.learning-alert{border-radius:10px}
+.learning-assessment-note{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.learning-school{max-width:1900px}
+.learning-hero h1{font-weight:500}
+.learning-hero p,.learning-content-block>p,.learning-lesson-heading p{line-height:1.85}
+@media(min-width:1800px){
+  .content-grid{gap:20px}
+  .card{padding:25px}
+  .workspace{grid-template-columns:260px minmax(0,1fr)}
+}
+@media(max-width:900px){
+  .topbar{height:66px;padding:0 16px}
+  .workspace{grid-template-columns:1fr}
+  .sidebar{position:relative;border-right:0;border-bottom:1px solid var(--glass-border);padding:12px 14px;display:flex;gap:7px;overflow-x:auto}
+  .side-label,.side-divider,.side-note,.sidebar-bottom{display:none}
+  .nav-item{white-space:nowrap;flex:0 0 auto;margin:0}
+  .main-content{padding:22px 16px 30px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+}
