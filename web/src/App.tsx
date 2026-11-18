@@ -55,7 +55,10 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
-  const [frameTimestamp, setFrameTimestamp] = useState("0");\n  const [sampleInterval, setSampleInterval] = useState("1");\n  const [sampleCount, setSampleCount] = useState("8");\n  const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
+  const [frameTimestamp, setFrameTimestamp] = useState("0");
+  const [sampleInterval, setSampleInterval] = useState("1");
+  const [sampleCount, setSampleCount] = useState("8");
+  const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
