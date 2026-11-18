@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .analysis import analyze_frame
 from .capabilities import capabilities_as_dict
+from .capture_matching import match_capture_profile
 from .probe import probe_media
 from .registry import ProfileRegistry
 
@@ -87,6 +88,14 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             "note": "Choose the exact camera model, encoding and gamut; no transform is inferred.",
         }
 
+
+    @app.post("/v1/profiles/match-capture")
+    async def match_capture(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        """Match explicitly reported capture metadata without guessing missing gamut."""
+        try:
+            return match_capture_profile(payload, profile_registry)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/v1/ocio/status")
     async def ocio_config_status() -> dict[str, Any]:
