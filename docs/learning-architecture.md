@@ -84,3 +84,31 @@ These are read-only catalogue endpoints. They do not yet store learner submissio
 3. Connect eligible technical exercises to native Correction Accuracy.
 4. Build a separate creative-reference comparison method and keep its score independent.
 5. Add learner progress persistence and a transparent skill report.
+
+## Guided exercise interface and learner records
+
+The web workspace now includes a **Learning School** navigation view with:
+- Nine lesson cards grouped by Beginner, Intermediate and Advanced.
+- Lesson concepts, practical task and evidence checklist.
+- A generated synthetic neutral practice chart download.
+- Exercise selection, evidence notes and still-image file submission.
+- Lesson completion and a learner progress/history panel.
+
+The generated chart is an educational sample only. It is not a measured reference target and cannot validate camera transforms.
+
+### Persistence and privacy boundary
+
+The API stores learner progress and submission metadata in a local SQLite database under `YRGB_LEARNING_DATA_DIR`, defaulting to `~/.colorist-yrgb/learning`. Submitted still files are copied into that directory's `uploads` folder. This is local single-instance persistence, not cloud sync, multi-user authentication or a secure hosted classroom. Anyone with access to the machine and data directory may access those records. Configure a protected data directory and back it up as needed.
+
+### Submission endpoints
+
+- `GET /v1/learning/assets/neutral-practice-chart.png` — download synthetic practice still.
+- `POST /v1/learning/lessons/{lesson_id}/complete` — record lesson completion for a learner ID.
+- `GET /v1/learning/progress?learner_id=...` — retrieve that learner's lesson and submission history.
+- `POST /v1/learning/submissions` — submit evidence and an optional/required still image depending on exercise type.
+
+The submission endpoint enforces a 100 MiB upload limit, checks file type by declared MIME/extension, and stores files under generated IDs rather than user-provided paths. It does not yet run an automatic grading assessment.
+
+### Assessment status
+
+The current reference correction exercise is marked as an instructional sample, not a measured reference. Therefore submissions remain **NOT SCORED** even when a learner supplies a profile ID and ROI. The API does not award a score based only on learner-supplied identifiers. A future assessment runner must independently confirm the registry's reference-validation status, verify the neutral/reference region, decode and measure the submitted still through the native engine, and only then publish Correction Accuracy. Creative Look Similarity remains a separate perceptual review track.
