@@ -1194,3 +1194,20 @@ def test_native_grade_export_rejects_unsupported_format():
         files={"file": ("still.tif", b"fake-image", "image/tiff")},
     )
     assert response.status_code == 422
+
+
+def test_cors_exposes_native_master_metadata_headers():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.options(
+        "/v1/media/native-grade-export",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200
+    exposed = response.headers.get("access-control-expose-headers", "").casefold()
+    assert "x-yrgb-frame-width" in exposed
+    assert "x-yrgb-frame-height" in exposed
+    assert "x-yrgb-float-samples-sha256" in exposed
