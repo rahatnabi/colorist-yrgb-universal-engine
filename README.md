@@ -1,3 +1,5 @@
+> **Product scope:** COLORIST YRGB is a still-image-only color analysis and grading workspace. Video and temporal workflows are not supported product features. See [Still-image-only product scope](docs/still-image-product-scope.md).
+
 # COLORIST YRGB — UNIVERSAL COLOR ENGINE
 
 **Image + Video · RAW + LOG · LUT + Color Science**
