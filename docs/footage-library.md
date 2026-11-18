@@ -74,7 +74,9 @@ The user supplied a Google Drive folder link and identified the clips as Sony S-
 
 Each clip has its own manifest record (`sony-slog3cine-c1382` and `sony-slog3cine-c1383`) so checksums, probe reports, metadata review, and later screenshot annotations can be tracked independently.
 
-**Important:** these names and the user-declared profile are intake leads, not verified media metadata. The actual media bytes have not yet been imported or hashed by this repository. The exact camera model, recording mode, codec, bit depth, frame rate, firmware, and embedded color tags remain unverified until the MP4 and XML bytes can be read.
+**Metadata summary received:** the user supplied a transcription of Sony FX30 XML metadata for these clips: ILME-FX30, Tamron E 17–70mm F2.8 B070, 3840×2160, XAVC S-I / AVC H.264 High 4:2:2 Profile Level 5.1, 4:2:2, 25.00p, S-Log3, S-Gamut3.Cine, Rec.709 coding equations, and 2-channel LPCM16 audio. The reported duration is 324 frames (12.96 s at 25 fps), with start timecode `12364108`; the reported related LUT is `SL3SG3Ctos709.cube`.
+
+This is a **user-supplied summary**, not a parsed XML file. Therefore the manifest records the reported values but deliberately leaves bit depth, pixel format, and range unknown. Although 10-bit is expected for this recording mode, it must be verified from the original stream/XML rather than assumed. The reported Rec.709 coding equations are stored separately from the S-Log3 transfer and S-Gamut3.Cine primaries; they are not treated as evidence that the footage is already Rec.709. The original media bytes have not yet been imported or hashed by this repository.
 
 For the initial intake, preserve the user-declared S-Log3 / S-Gamut3.Cine as an annotation with provenance `user_asserted`; do not let it automatically approve or apply a transform. The capture matcher must still check exact camera model and available metadata, and the camera transform remains unverified until independent reference vectors pass the validation gate.
 
