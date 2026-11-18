@@ -1,94 +1,86 @@
-# COLORIST YRGB — Learning Architecture (Milestone 1)
+# COLORIST YRGB — Still-Image Learning Architecture
 
-Status: **curriculum architecture complete; delivery/content production is a later implementation activity.**
+Status: **curriculum catalogue and read-only learning API implemented; learner progress tracking and full lesson media remain future work.**
+
+## Product scope
+
+This curriculum teaches grading and assessment of **still images only**. It does not define video lessons, clip/frame analysis, temporal diagnostics, or video-grading workflows.
 
 ## Learning outcome
 
-A learner should be able to inspect unfamiliar still/video media, identify its technical properties, choose a defensible input transform, evaluate exposure and color with scopes, match shots, create a restrained look, and deliver a technically valid master. The curriculum teaches measurement before aesthetics and makes uncertainty visible.
-
-## Instructional design
-
-- **Workflow-first:** every concept is taught in the order it appears in a real grading session.
-- **Evidence-first:** learners must identify source encoding, gamut, bit depth, and metadata before applying a transform.
-- **One variable at a time:** exercises isolate exposure, white balance, contrast, saturation, and look design.
-- **Scope-supported, not scope-only:** waveform, RGB parade, histogram, vectorscope, and image judgement are used together.
-- **Camera-agnostic:** examples cover multiple manufacturers, but no profile is treated as universal.
-- **Practice-led:** every lesson ends with an observable task and a saved result.
-- **Honest validation:** an attractive image is not proof of a correct transform; an unverified profile must remain labelled unverified.
+A learner should be able to inspect an unfamiliar still image, identify what is known and unknown about its encoding, select only a reference-validated input transform, evaluate exposure and neutral balance with declared measurements, interpret scopes in their actual sample domain, match a designated reference still, develop a repeatable creative look, and verify a float master.
 
 ## Learner pathway
 
-| Unit | Focus | Required practical outcome |
+| Level | Lesson | Observable outcome |
 |---|---|---|
-| 0 | Orientation, color pipeline, project setup | Create a documented project and identify its working/output spaces |
-| 1 | Media literacy: containers, codecs, bit depth, chroma, metadata | Produce a media inspection report |
-| 2 | Log, gamut, RAW, scene/display reference | Distinguish transfer function, gamut, container, and codec |
-| 3 | Input transforms and color management | Build a traceable camera-to-working-space pipeline |
-| 4 | Exposure and white balance | Correct exposure and neutral balance using declared references |
-| 5 | Scopes and diagnostics | Read waveform, RGB parade, histogram, and vectorscope without confusing code values with scene-linear values |
-| 6 | Shot matching | Match a selected reference shot and explain the measurement choices |
-| 7 | Creative look development | Build a repeatable look with controlled contrast, saturation, hue, and texture |
-| 8 | Skin, mixed lighting, and difficult scenes | Diagnose mixed illuminants and evaluate skin regions without assuming one universal skin color |
-| 9 | Stills, video, sequences, and LUTs | Process representative image/video assets and validate LUT input/output assumptions |
-| 10 | Output, QC, and delivery | Export a master and complete a delivery/QC checklist |
-| 11 | Capstone | Grade a short scene from ingest to final delivery and submit an audit trail |
+| Beginner | The still-image color pipeline | Draw a source-to-Rec.709 pipeline |
+| Beginner | Read the still before grading | Separate container, codec, bit depth, transfer and gamut |
+| Beginner | Exposure and neutral balance | Select a defensible neutral ROI and explain the 18% reference |
+| Intermediate | Scopes as diagnostic evidence | Interpret histogram, RGB parade, waveform and vectorscope with domain caveats |
+| Intermediate | Reference-based still matching | Match a candidate still to a designated reference |
+| Intermediate | Controlled look development | Create repeatable looks without confusing creative intent with technical correction |
+| Advanced | Mixed light and difficult color | Identify where neutral measurements are and are not defensible |
+| Advanced | Transform validation and uncertainty | Audit evidence before a camera transform is approved |
+| Advanced | Float master and delivery QC | Verify the exported still and review its delivery report |
 
-## Lesson template
+## Standard lesson structure
 
-Every lesson uses the same structure:
-1. **Why it matters** — the production problem being solved.
-2. **Core concept** — a short explanation with terminology.
-3. **Pipeline location** — where the operation belongs (decode, input transform, working space, display, output).
-4. **Demonstration** — a reproducible example with known source settings.
-5. **Guided exercise** — a constrained task with one main learning objective.
-6. **Independent challenge** — a less familiar shot or image.
-7. **Scope evidence** — which scopes/measurements support the decision.
-8. **Common failure modes** — wrong gamut, double transform, clipping, legal/full range confusion, wrong bit-depth assumptions, etc.
-9. **Submission** — project, still, settings, and short explanation.
-10. **Self-assessment** — rubric plus reflection.
+Every lesson should include:
+1. Why the concept matters in a real still-image grading task.
+2. Core concept and terminology.
+3. Pipeline location: decode, input transform, working space, display or output.
+4. Demonstration using a clearly identified still and known source properties.
+5. Guided exercise with one main learning objective.
+6. Independent challenge using a different still.
+7. Scope and measurement evidence, including limitations.
+8. Common failure modes and uncertainty notes.
+9. Submission: still, settings, measurements and short explanation.
+10. Self-assessment and reflection.
 
-## Exercise and assessment system
+## Exercise catalogue
 
-Each unit has three exercise levels:
-- **Foundation:** identify, label, and explain.
-- **Applied:** perform a controlled correction on supplied media.
-- **Transfer:** solve a new shot with incomplete or mixed metadata and document uncertainty.
+The initial API catalogue contains:
+- **EX-B03-01 — Exposure reference basics:** knowledge-only; no image score.
+- **EX-I02-01 — Neutral patch correction:** guided technical correction; only eligible for objective Correction Accuracy when validated source data and a genuine neutral ROI are supplied.
+- **EX-I03-01 — Creative reference interpretation:** creative challenge; assessed separately against a designated creative still reference.
 
-### Assessment rubric (100 points)
+The current exercise targets are instructional examples, not measured camera reference vectors and not approval evidence for any camera transform. The catalogue deliberately does not claim that downloadable practice assets are attached.
 
-| Criterion | Points | Evidence |
-|---|---:|---|
-| Media/profile identification | 15 | Correctly distinguishes codec, transfer, gamut, and camera model |
-| Color-management integrity | 20 | Explicit, non-duplicated input/working/output transforms |
-| Exposure and balance | 15 | Measured decisions with correct signal-domain assumptions |
-| Scope interpretation | 15 | Correct use and limitations of scopes |
-| Shot continuity | 10 | Consistent reference relationship across shots |
-| Creative intent | 10 | Controlled, repeatable look decisions |
-| Output/QC | 10 | Correct format, tags, levels, and delivery checks |
-| Documentation | 5 | Reproducible notes and evidence |
+## Assessment policy
 
-**Critical-failure gates:** an incorrect or guessed camera transform, an undisclosed double transform, or a false claim of color accuracy prevents a passing technical-integrity score regardless of aesthetic quality.
+Two assessment tracks must remain independent:
 
-## Suggested 30-day starter sequence
+### Correction Accuracy
+Objective, exercise-target technical correction measurement. It may be scored only when the input transform is reference-validated, the working domain is validated linear RGB, required regions are explicitly selected, and the exercise target is defined. Missing evidence means **NOT SCORED**, not a guessed score.
 
-- Days 1–3: pipeline vocabulary, media inspection, and metadata report.
-- Days 4–6: transfer functions, gamuts, and input transforms.
-- Days 7–9: exposure and white balance.
-- Days 10–12: waveform, parade, histogram, and vectorscope.
-- Days 13–15: shot matching.
-- Days 16–19: contrast, saturation, curves, and look design.
-- Days 20–22: mixed lighting and skin-region diagnostics.
-- Days 23–25: still/video/LUT handling.
-- Days 26–28: output transforms and QC.
-- Days 29–30: capstone grade and review.
+### Creative Look Similarity
+Perceptual comparison against a designated creative reference still. It describes resemblance to that reference, not objective technical correctness or a universally correct look.
 
-## Completion criteria for Milestone 1
+These values must never be combined into one score. An attractive result is not evidence that a camera transform is technically valid.
 
-- [x] Learning outcomes and workflow sequence defined.
-- [x] Unit-level curriculum and practical outcomes defined.
-- [x] Standard lesson template defined.
-- [x] Exercise progression and assessment rubric defined.
-- [x] Technical-integrity failure gates defined.
-- [x] Starter 30-day sequence defined.
+## Technical-integrity gates
 
-This milestone completes the **learning architecture specification**. It does not claim that all lessons, video tutorials, downloadable exercises, or grading assessments have already been produced or deployed.
+- Unknown or unverified camera transforms cannot be silently selected.
+- A double input transform is a critical failure.
+- Scope values must retain their declared sample-domain labels; browser-decoded sRGB samples must not be described as camera-log IRE or calibrated nits.
+- Learner-selected ROIs are not automatically recognized as gray cards or neutral objects.
+- No objective score is issued from unvalidated image data.
+- Synthetic or instructional values cannot validate production camera transforms.
+
+## API surface
+
+- `GET /v1/learning/curriculum` — level structure and complete lesson catalogue.
+- `GET /v1/learning/exercises` — exercise catalogue; optional `level=beginner|intermediate|advanced`.
+- `GET /v1/learning/lessons/{lesson_id}` — one lesson.
+- `GET /v1/learning/exercises/{exercise_id}` — one exercise.
+
+These are read-only catalogue endpoints. They do not yet store learner submissions, progress, grades, or personal profiles.
+
+## Next implementation milestones
+
+1. Attach licensed, traceable still-image practice assets and record their actual metadata.
+2. Add guided exercise UI with a selected still, task brief and submission evidence.
+3. Connect eligible technical exercises to native Correction Accuracy.
+4. Build a separate creative-reference comparison method and keep its score independent.
+5. Add learner progress persistence and a transparent skill report.
