@@ -1,6 +1,6 @@
 # COLORIST YRGB — Dual Accuracy Scoring
 
-Status: **scoring contract / implementation specification**. Scores must not be displayed as validated until the required color pipeline and reference data are available.
+Status: **scoring foundation + first image-measurement integration**. Correction Accuracy can now be calculated from an explicitly selected ROI on a validated linear-RGB PrecisionFrame. Raw decoder output remains ineligible until a validated color transform is applied.
 
 ## Product rule
 
@@ -36,7 +36,7 @@ This is a transparent training rubric, not a universal perceptual law. The exerc
 
 The Correction Accuracy score is the weighted mean of valid criterion scores. If a required criterion cannot be measured, return not_scored with a reason rather than guessing or silently redistributing its weight. Optional criteria may be omitted only when the exercise definition marks them optional.
 
-## 2. Creative Look Similarity
+### Current Correction Accuracy integration\n\n`src/yrgb_engine/accuracy.py` connects the validated linear-light ROI measurement in `exposure.py` to the independent `correction_accuracy` score in `scoring.py`. It currently measures exposure deviation from the exercise target and neutral channel spread. The exercise must provide the ROI, luminance coefficients, gray reference, tolerances and weights. A validated `working_space_id` and `transform_id` are mandatory. Synthetic tests cover neutral 18% gray, exposure deviation, invalid pipeline metadata and invalid coefficients.\n\nThis is the first vertical slice, not a complete correction rubric: tonal-structure targets, additional WB/chromaticity metrics, a public API endpoint, grading-workspace UI and report export remain future work. The current OpenImageIO decoder deliberately marks its output as uncharacterized, so decoded uploads do not receive this score automatically.\n\n## 2. Creative Look Similarity
 
 This score compares the learner's exported/rendered still with a designated target-look reference. It is not a judgement of whether the creative choice is aesthetically good.
 
