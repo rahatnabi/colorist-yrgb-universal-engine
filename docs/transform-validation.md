@@ -50,3 +50,12 @@ The candidate registry now includes:
 - Blackmagic Pocket Cinema Camera 4K and 6K family: separate Gen 4 and Gen 5 candidates, tied to explicit camera-model lists.
 
 These are catalogue entries, not validated conversion transforms. Every new/updated entry remains `unverified` and cannot drive a transform until independent reference vectors, a pinned OCIO configuration, and a passing validation record are supplied. Camera mode, codec, firmware, and RAW decode metadata may still affect the correct interpretation. In particular, never apply a Luna I-Log curve to X-series I-Log simply because the display label is similar.
+
+
+### Apple Log family
+
+Apple is represented by two distinct candidate records:
+- `Apple Log / BT.2020`: Apple-defined Log transfer function with BT.2020 primaries; recording support begins with iPhone 15 Pro.
+- `Apple Log 2 / Apple Gamut`: a separate Apple-defined Log transfer function with Apple Gamut primaries; recording support begins with iPhone 17 Pro.
+
+Do not substitute Apple Log for Apple Log 2 or vice versa. Preserve transfer-function and color-primaries metadata from the media when available. Both registry entries remain unverified until independently checked against authoritative reference vectors and a pinned transform configuration.
