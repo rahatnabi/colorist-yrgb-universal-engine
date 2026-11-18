@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
 type Probe = { detected_type?: string; status?: string; signature?: string; warnings?: string[]; metadata?: Record<string, unknown> };
 type ProbeResponse = { filename: string; size_bytes: number; probe: Probe };
+type OcioStatus = { configured: boolean; status: string; config_name?: string; ocio_version?: string; color_space_count?: number; preview_space_available?: boolean; note: string };
 type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; validation_status?: string; transform_mapping_status?: string; resolution_note?: string; camera_models?: string[] };
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
@@ -51,6 +52,7 @@ function ScopePanel({ title, subtitle, icon, histograms, parades }: { title: str
 
 export default function App() {
   const [apiOnline, setApiOnline] = useState(false);
+  const [ocioStatus, setOcioStatus] = useState<OcioStatus | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
@@ -88,7 +90,10 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    fetch(`${API_BASE}/health`).then(r => r.ok).then(ok => { if (active) setApiOnline(ok); }).catch(() => { if (active) setApiOnline(false); });
+    fetch(`${API_BASE}/health`).then(r => r.ok).then(ok => {
+      if (active) setApiOnline(ok);
+      if (ok) fetch(`${API_BASE}/v1/ocio/status`).then(r => r.json()).then(data => { if (active) setOcioStatus(data as OcioStatus); }).catch(() => { if (active) setOcioStatus(null); });
+    }).catch(() => { if (active) setApiOnline(false); });
     return () => { active = false; };
   }, []);
 
@@ -263,6 +268,7 @@ export default function App() {
 
           <section className="card profile-card">
             <div className="card-heading"><div><span className="section-kicker">INPUT TRANSFORM RESEARCH</span><h2>Camera Profile</h2></div><ScanSearch size={18} className="muted-icon" /></div>
+            {ocioStatus && <p className="profile-note">OCIO CONFIG · {ocioStatus.status.replaceAll("_", " ").toUpperCase()}{ocioStatus.config_name ? " · " + ocioStatus.config_name : ""}{ocioStatus.ocio_version ? " · OCIO " + ocioStatus.ocio_version : ""}{ocioStatus.note ? " — " + ocioStatus.note : ""}</p>}
             <form onSubmit={findProfiles} className="profile-form">
               <label>MANUFACTURER<input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="e.g. Sony" required /></label>
               <label>LOG / GAMMA ENCODING<input value={encoding} onChange={e => setEncoding(e.target.value)} placeholder="e.g. S-Log3" /></label>
