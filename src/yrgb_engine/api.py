@@ -13,7 +13,8 @@ from typing import Any
 from dataclasses import asdict
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
+from starlette.background import BackgroundTask
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -436,20 +437,23 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 with tempfile.NamedTemporaryFile(prefix="yrgb-look-out-", suffix=".exr", delete=False) as output:
                     temporary_output = output.name
                 await run_in_threadpool(save_linear_float_exr, graded, temporary_output)
-                content = Path(temporary_output).read_bytes()
                 safe_name = "".join(
                     char for char in Path(filename).stem if char.isalnum() or char in "-_ "
                 ).strip().replace(" ", "_") or "YRGB_Graded"
-                return Response(
-                    content=content,
+                output_path = Path(temporary_output)
+                response = FileResponse(
+                    output_path,
                     media_type="image/x-exr",
+                    filename=f"{safe_name}_graded_linear.exr",
                     headers={
-                        "Content-Disposition": f'attachment; filename="{safe_name}_graded_linear.exr"',
                         "X-YRGB-Working-Space": input_space_id,
                         "X-YRGB-Transform-Validated": "false",
                         "X-YRGB-Output-Transfer": "scene-linear",
                     },
+                    background=BackgroundTask(output_path.unlink, missing_ok=True),
                 )
+                temporary_output = None
+                return response
             except HTTPException:
                 raise
             except (HighPrecisionDecodeError, LinearExportError, LookDevelopmentError, ValueError, TypeError, json.JSONDecodeError) as exc:
