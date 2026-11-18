@@ -93,11 +93,6 @@ def save_frame_image(
     This is a display/render boundary: values are clamped to [0, 1] here only.
     It does not create a missing output transform or certify the output profile.
     """
-    try:
-        from PIL import Image
-    except ImportError as exc:
-        raise ImageExportError("Pillow is required. Install the 'images' extra.") from exc
-
     normalized_format = image_format.upper()
     if normalized_format not in {"JPEG", "PNG", "TIFF"}:
         raise ImageExportError("Supported still-image exports are JPEG, PNG and TIFF.")
@@ -109,6 +104,10 @@ def save_frame_image(
         raise ImageExportError("Output transfer must match the frame transfer declaration.")
     if not 1 <= quality <= 100:
         raise ImageExportError("JPEG quality must be between 1 and 100.")
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise ImageExportError("Pillow is required. Install the 'images' extra.") from exc
     channels = {name.upper(): index for index, name in enumerate(frame.channel_names)}
     if not all(name in channels for name in ("R", "G", "B")):
         raise ImageExportError("Frame must contain named R, G and B channels.")
