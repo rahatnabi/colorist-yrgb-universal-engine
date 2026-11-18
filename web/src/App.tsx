@@ -73,6 +73,7 @@ export default function App() {
   const [lutBusy, setLutBusy] = useState(false);
   const [lookTitle, setLookTitle] = useState("COLORIST YRGB Look");
   const [lookSpace, setLookSpace] = useState("scene-linear-rec709");
+  const [lookLuma, setLookLuma] = useState([0.2126, 0.7152, 0.0722]);
   const [lookSettings, setLookSettings] = useState({ exposure_stops: 0, contrast: 1, pivot: 0.18, saturation: 1, temperature_shift: 0, tint_shift: 0 });
   const [lookNote, setLookNote] = useState("");
   const [lookBusy, setLookBusy] = useState(false);
@@ -259,7 +260,7 @@ export default function App() {
           <p className="lut-export-description">Build a parametric look and bake it directly into a 3D .cube LUT. This first version operates in linear RGB; it does not decode camera Log or perform a Rec.709 display transform.</p>
           <div className="look-identity-fields">
             <label>LOOK NAME<input value={lookTitle} onChange={e => setLookTitle(e.target.value)} maxLength={120} /></label>
-            <label>LINEAR RGB INPUT SPACE ID<input value={lookSpace} onChange={e => setLookSpace(e.target.value)} /></label>
+            <label>LINEAR RGB WORKING SPACE<select value={lookSpace} onChange={e => { const next = e.target.value; setLookSpace(next); setLookLuma(next === "acescg-linear" ? [0.2722287, 0.6740818, 0.0536895] : [0.2126, 0.7152, 0.0722]); }}><option value="scene-linear-rec709">Scene-linear Rec.709</option><option value="acescg-linear">ACEScg Linear</option></select></label>
           </div>
           <div className="look-control-grid">
             {([
@@ -281,7 +282,7 @@ export default function App() {
               try {
                 const response = await fetch(API_BASE + "/v1/look/export-cube", {
                   method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ size: Number(lutSize), title: lookTitle, input_space_id: lookSpace, input_transfer: "scene-linear", settings: lookSettings }),
+                  body: JSON.stringify({ size: Number(lutSize), title: lookTitle, input_space_id: lookSpace, input_transfer: "scene-linear", settings: { ...lookSettings, luminance_coefficients: lookLuma } }),
                 });
                 if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Look LUT generation failed"); }
                 const blob = await response.blob(); const url = URL.createObjectURL(blob);
