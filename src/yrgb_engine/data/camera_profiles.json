@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0.0",
-  "registry_status": "initial-candidate-catalogue",
-  "policy": "A profile is not usable for color conversion until its exact transform implementation and reference tests are verified.",
+  "schema_version": "1.1.0",
+  "registry_status": "expanded-candidate-catalogue",
+  "policy": "A profile is not usable for color conversion until its exact transform implementation and independent reference tests are verified. Candidate records never imply transform support.",
   "profiles": [
     {
       "id": "sony.slog3.sgamut3cine",
@@ -72,13 +72,18 @@
     {
       "id": "blackmagic.film_gen5.bmd_wide_gamut",
       "manufacturer": "Blackmagic Design",
-      "camera_models": [],
+      "camera_models": [
+        "Blackmagic Pocket Cinema Camera 4K",
+        "Blackmagic Pocket Cinema Camera 6K",
+        "Blackmagic Pocket Cinema Camera 6K Pro",
+        "Blackmagic Pocket Cinema Camera 6K G2"
+      ],
       "encoding": "Blackmagic Film Gen 5",
       "gamut": "Blackmagic Wide Gamut",
       "generation": "Gen 5",
       "transform_id": null,
       "status": "unverified",
-      "notes": "Do not merge with earlier Blackmagic Film generations."
+      "notes": "Pocket Cinema Camera 4K/6K family candidate for Gen 5 decode. Confirm clip metadata and RAW decode settings; not transform-validated."
     },
     {
       "id": "panasonic.vlog.vgamut",
@@ -107,22 +112,22 @@
       "manufacturer": "Nikon",
       "camera_models": [],
       "encoding": "N-Log",
-      "gamut": null,
+      "gamut": "N-Gamut",
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Gamut and camera-specific requirements must be explicitly resolved."
+      "notes": "Nikon N-Log paired with Nikon N-Gamut. Confirm camera model, codec and metadata; not transform-validated."
     },
     {
       "id": "dji.dlog",
       "manufacturer": "DJI",
       "camera_models": [],
       "encoding": "D-Log",
-      "gamut": null,
+      "gamut": "D-Gamut",
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Do not conflate with D-Log M."
+      "notes": "DJI D-Log paired with D-Gamut. Keep distinct from D-Log M and D-Log2; confirm exact camera model and recording mode."
     },
     {
       "id": "dji.dlogm",
@@ -145,6 +150,61 @@
       "transform_id": null,
       "status": "unverified",
       "notes": "Device and capture application metadata may be required."
+    },
+    {
+      "id": "blackmagic.film_gen4.pocket_4k_6k",
+      "manufacturer": "Blackmagic Design",
+      "camera_models": [
+        "Blackmagic Pocket Cinema Camera 4K",
+        "Blackmagic Pocket Cinema Camera 6K",
+        "Blackmagic Pocket Cinema Camera 6K Pro",
+        "Blackmagic Pocket Cinema Camera 6K G2"
+      ],
+      "encoding": "Blackmagic Film Gen 4",
+      "gamut": "Blackmagic Design",
+      "generation": "Gen 4",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Separate Gen 4 profile for Pocket Cinema Camera 4K/6K family. Confirm exact camera RAW/ProRes mode and metadata; not transform-validated."
+    },
+    {
+      "id": "insta360.ilog.luna_rec2020",
+      "manufacturer": "Insta360",
+      "camera_models": [
+        "Insta360 Luna Ultra",
+        "Insta360 Luna Pro"
+      ],
+      "encoding": "I-Log",
+      "gamut": "Rec.2020",
+      "generation": "Luna Series 10-bit I-Log",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Official Insta360 guidance identifies Rec.2020 input color space and Insta360 I-Log gamma in DaVinci Resolve 21+. Keep separate from X-series I-Log."
+    },
+    {
+      "id": "insta360.ilog.x5_x6_bt2020",
+      "manufacturer": "Insta360",
+      "camera_models": [
+        "Insta360 X5",
+        "Insta360 X6"
+      ],
+      "encoding": "I-Log 10-bit",
+      "gamut": "BT.2020",
+      "generation": "X-Series I-Log 10-bit",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "X5/X6 I-Log variant. Confirm supported recording mode and camera metadata; do not reuse Luna-series curve without reference validation."
+    },
+    {
+      "id": "red.log3g12.redwidegamutrgb",
+      "manufacturer": "RED",
+      "camera_models": [],
+      "encoding": "Log3G12",
+      "gamut": "REDWideGamutRGB",
+      "generation": "Log3G12",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Separate from Log3G10; requires exact RED camera/decode metadata and independent reference validation."
     }
   ]
 }
