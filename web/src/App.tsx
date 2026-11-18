@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";
+import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";\nimport InteractiveGradingPreview from "./InteractiveGradingPreview";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
@@ -589,7 +589,7 @@ export default function App() {
             <label>LOOK NAME<input value={lookTitle} onChange={e => setLookTitle(e.target.value)} maxLength={120} /></label>
             <label>LINEAR RGB WORKING SPACE<select value={lookSpace} onChange={e => { const next = e.target.value; setLookSpace(next); setLookLuma(next === "acescg-linear" ? [0.2722287, 0.6740818, 0.0536895] : [0.2126, 0.7152, 0.0722]); }}><option value="scene-linear-rec709">Scene-linear Rec.709</option><option value="acescg-linear">ACEScg Linear</option></select></label>
           </div>
-          <div className="look-control-grid">
+          {isImage && previewUrl && <InteractiveGradingPreview sourceUrl={previewUrl} filename={file?.name || "image"} settings={lookSettings} curveMidpoint={lookCurveMid} />}\n          <div className="look-control-grid">
             {([
               ["exposure_stops", "EXPOSURE", -5, 5, 0.1, "stops"],
               ["contrast", "CONTRAST", 0, 2, 0.01, "×"],
