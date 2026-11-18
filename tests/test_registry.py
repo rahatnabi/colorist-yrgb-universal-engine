@@ -14,6 +14,7 @@ def test_exact_profile_is_not_assumed_verified():
         manufacturer="Sony",
         encoding="S-Log3",
         gamut="S-Gamut3.Cine",
+        camera_model="ILME-FX6",
     )
     assert profile is not None
     assert profile["usable_for_transform"] is False
@@ -25,6 +26,7 @@ def test_wrong_gamut_resolves_only_its_own_candidate():
         manufacturer="Sony",
         encoding="S-Log3",
         gamut="S-Gamut3",
+        camera_model="ILME-FX6",
     )
     assert profile is not None
     assert profile["id"] == "sony.slog3.sgamut3"
@@ -126,7 +128,7 @@ def test_candidate_discovery_returns_distinct_gamut_choices_without_guessing():
         "S-Gamut3", "S-Gamut3.Cine"
     }
     assert all(
-        item["selection_requirements"] == ["gamut_choice"]
+        item["selection_requirements"] == ["gamut_choice", "camera_model"]
         for item in candidates
     )
     assert all(item["usable_for_transform"] is False for item in candidates)
@@ -160,6 +162,7 @@ def test_candidate_discovery_can_narrow_to_exact_profile_variant():
         manufacturer="Sony",
         encoding="S-Log3",
         gamut="S-Gamut3.Cine",
+        camera_model="ILME-FX3",
     )
     assert [item["id"] for item in candidates] == ["sony.slog3.sgamut3cine"]
     assert candidates[0]["selection_requirements"] == []
