@@ -31,6 +31,11 @@ def save_linear_float_exr(frame: PrecisionFrame, output_path: str | Path) -> Pat
     destination.parent.mkdir(parents=True, exist_ok=True)
     spec = oiio.ImageSpec(frame.width, frame.height, frame.channel_count, oiio.FLOAT)
     spec.channelnames = list(frame.channel_names)
+    # Keep the declared color contract with the file without implying validation.
+    spec.attribute("yrgb:working_space_id", frame.encoding.working_space_id or "unknown")
+    spec.attribute("yrgb:transfer", frame.encoding.transfer)
+    spec.attribute("yrgb:transform_validated", int(frame.encoding.validated))
+    spec.attribute("yrgb:transform_id", frame.encoding.transform_id or "unknown")
     image_output = oiio.ImageOutput.create(str(destination))
     if image_output is None:
         raise LinearExportError(oiio.geterror() or "OpenImageIO could not create EXR output.")
