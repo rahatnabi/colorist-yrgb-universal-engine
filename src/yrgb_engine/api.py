@@ -397,6 +397,132 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             await file.close()
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
+    @app.post("/v1/media/video-temporal-report")
+    async def media_video_temporal_report(
+        file: UploadFile = File(...),
+        start_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+        interval_seconds: float = Query(default=1.0, gt=0.0, le=60.0),
+        frame_count: int = Query(default=8, ge=1, le=24),
+    ) -> dict[str, Any]:
+        """Measure domain-separated YUV and RGB statistics across bounded samples.
+
+        Samples are sequentially decoded; this endpoint does not classify flicker,
+        scene cuts, or camera exposure drift as a definitive result.
+        """
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-temporal-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+            if start_seconds + (frame_count - 1) * interval_seconds > 86400.0:
+                raise HTTPException(status_code=422, detail="Requested sample timestamps exceed the 86400-second limit.")
+
+            from .oiio_decoder import HighPrecisionDecodeError
+            from .video_precision import decode_video_float_frame
+            from .video_yuv import decode_video_yuv_frame
+
+            samples: list[dict[str, Any]] = []
+            previous: dict[str, float] | None = None
+            max_step_delta: dict[str, float] = {}
+            first_means: dict[str, float] | None = None
+            last_means: dict[str, float] | None = None
+            stream_signaling: dict[str, str] | None = None
+            for sample_index in range(frame_count):
+                timestamp = start_seconds + sample_index * interval_seconds
+                try:
+                    yuv_frame = await run_in_threadpool(decode_video_yuv_frame, temporary_path, timestamp_seconds=timestamp)
+                    rgb_frame = await run_in_threadpool(decode_video_float_frame, temporary_path, timestamp_seconds=timestamp)
+                    yuv = await run_in_threadpool(yuv_frame.to_report)
+                except HighPrecisionDecodeError as exc:
+                    message = str(exc)
+                    if "required" in message.lower() or "install ffmpeg" in message.lower() or "not found on path" in message.lower():
+                        raise HTTPException(status_code=503, detail=message) from exc
+                    raise HTTPException(status_code=422, detail=message) from exc
+
+                rgb = await run_in_threadpool(
+                    analyze_frame, rgb_frame, histogram_bins=64, scope_width=64,
+                    scope_height=48, value_range=(0.0, 1.0),
+                )
+                rgb_means = {name: stats.mean for name, stats in rgb.channels.items()}
+                yuv_means = {name: stats["mean_code_value"] for name, stats in yuv["planes"].items()}
+                combined = {f"rgb_{key}": value for key, value in rgb_means.items()}
+                combined.update({f"yuv_{key}": value for key, value in yuv_means.items()})
+                if first_means is None:
+                    first_means = combined
+                    stream_signaling = {
+                        "range": yuv_frame.range_signaling, "matrix": yuv_frame.matrix_signaling,
+                        "transfer": yuv_frame.transfer_signaling, "primaries": yuv_frame.primaries_signaling,
+                    }
+                if previous is not None:
+                    for key, value in combined.items():
+                        delta = value - previous[key]
+                        max_step_delta[key] = max(max_step_delta.get(key, 0.0), abs(delta))
+                previous = combined
+                last_means = combined
+                samples.append({
+                    "sample_index": sample_index, "source_frame_index": None,
+                    "timestamp_seconds": timestamp,
+                    "dimensions": {"width": yuv_frame.width, "height": yuv_frame.height},
+                    "yuv": yuv,
+                    "nonlinear_rgb": {
+                        "sample_domain": rgb_frame.sample_domain,
+                        "channels": {name: asdict(stats) for name, stats in rgb.channels.items()},
+                    },
+                })
+
+            digest = await run_in_threadpool(lambda: hashlib.sha256(Path(temporary_path).read_bytes()).hexdigest())
+            drift = {key: last_means[key] - first_means[key] for key in first_means} if len(samples) > 1 else {}
+            return {
+                "filename": filename, "size_bytes": total, "source_sha256": digest,
+                "sampling": {
+                    "start_seconds": start_seconds, "interval_seconds": interval_seconds,
+                    "sample_count": len(samples), "source_frame_indices": "unresolved; timestamps only",
+                },
+                "color_metadata": {
+                    "stream_signaled": stream_signaling, "xml_declared": {},
+                    "resolution_status": "unresolved",
+                },
+                "measurement_domains": {
+                    "original_yuv_code_values": {
+                        "status": "reported", "frames": [item["yuv"] for item in samples],
+                    },
+                    "nonlinear_rgb_code_values": {
+                        "status": "reported", "frames": [item["nonlinear_rgb"] for item in samples],
+                    },
+                    "linear_light_rgb": {
+                        "status": "unavailable",
+                        "reason": "No validated per-pixel inverse-transfer transform was applied.",
+                    },
+                },
+                "temporal_analysis": {
+                    "status": "reported", "classification": "not_classified",
+                    "first_to_last_mean_delta": drift,
+                    "maximum_absolute_step_delta": max_step_delta,
+                    "notes": [
+                        "Deltas compare decoded sample means only; they are not exposure or flicker measurements.",
+                        "No scene-cut classification or source timecode/frame-index mapping is performed.",
+                        "YUV code values and decoder RGB values remain separate measurement domains.",
+                    ],
+                },
+                "samples": samples,
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
     @app.post("/v1/media/video-sample")
     async def media_video_sample(
         file: UploadFile = File(...),

@@ -573,3 +573,62 @@ def test_video_report_endpoint_rejects_empty_upload():
     client = TestClient(create_app(registry=ProfileRegistry([])))
     response = client.post("/v1/media/video-report", files={"file": ("empty.mp4", b"", "video/mp4")})
     assert response.status_code == 400
+
+def test_video_temporal_report_keeps_domains_separate_and_reports_sample_deltas(monkeypatch):
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    class FakeYUVFrame:
+        width = 1
+        height = 1
+        def __init__(self, timestamp):
+            self.timestamp = timestamp
+            self.range_signaling = "tv"
+            self.matrix_signaling = "bt709"
+            self.transfer_signaling = "bt709"
+            self.primaries_signaling = "bt709"
+        def to_report(self):
+            value = 100 + int(self.timestamp * 10)
+            return {
+                "measurement_domain": "original_yuv_code_values",
+                "timestamp_seconds": self.timestamp, "pixel_format": "yuv444p10le",
+                "bit_depth": 10, "planes": {
+                    "Y": {"minimum_code_value": value, "maximum_code_value": value, "mean_code_value": float(value), "sample_count": 1},
+                    "U": {"minimum_code_value": 512, "maximum_code_value": 512, "mean_code_value": 512.0, "sample_count": 1},
+                    "V": {"minimum_code_value": 512, "maximum_code_value": 512, "mean_code_value": 512.0, "sample_count": 1},
+                },
+            }
+
+    def fake_yuv(_path, *, timestamp_seconds):
+        return FakeYUVFrame(timestamp_seconds)
+    def fake_rgb(_path, *, timestamp_seconds):
+        value = 0.1 + timestamp_seconds * 0.1
+        return PrecisionFrame.from_interleaved(
+            width=1, height=1, channel_names=("R", "G", "B"),
+            values=(value, value + 0.1, value + 0.2), source_path="clip.mp4",
+            decoder="mock-ffmpeg", encoding=ColorEncoding(transfer="bt709"),
+        )
+    monkeypatch.setattr("yrgb_engine.video_yuv.decode_video_yuv_frame", fake_yuv)
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_rgb)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-temporal-report?start_seconds=0&interval_seconds=1&frame_count=3",
+        files={"file": ("clip.mp4", b"mock-original-video", "video/mp4")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["sampling"]["sample_count"] == 3
+    domains = payload["measurement_domains"]
+    assert len(domains["original_yuv_code_values"]["frames"]) == 3
+    assert len(domains["nonlinear_rgb_code_values"]["frames"]) == 3
+    assert domains["linear_light_rgb"]["status"] == "unavailable"
+    assert payload["temporal_analysis"]["classification"] == "not_classified"
+    assert payload["temporal_analysis"]["first_to_last_mean_delta"]["rgb_R"] == pytest.approx(0.2)
+
+
+def test_video_temporal_report_rejects_frame_count_over_limit():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-temporal-report?frame_count=25",
+        files={"file": ("clip.mp4", b"mock-video", "video/mp4")},
+    )
+    assert response.status_code == 422
