@@ -146,3 +146,58 @@ POST /v1/media/video-transform-preview?timestamp_seconds=... performs the same r
 ## OCIO configuration status
 
 `GET /v1/ocio/status` reports whether the server-managed OCIO config can be loaded, its filename and SHA-256, the OCIO version, and whether each mapped camera source space and configured preview destination exists in that config. It does not expose the server's absolute config path and does not certify a camera transform. A color-space name being present is only a configuration compatibility check; the independent reference-validation gate remains mandatory.
+
+
+## Capture-metadata profile matching
+
+`POST /v1/profiles/match-capture` accepts a JSON object containing only
+metadata that the media probe or operator can explicitly report. It returns
+candidate profiles and a conservative status; it never selects a transform.
+
+Example request:
+
+```json
+{
+  "camera_make": "Sony",
+  "camera_model": "ILME-FX6",
+  "color_transfer": "S-Log3",
+  "color_primaries": "bt2020",
+  "metadata_tags": {}
+}
+```
+
+Example response shape (candidate details abbreviated):
+
+```json
+{
+  "status": "needs_gamut_confirmation",
+  "selection_made": false,
+  "camera_make": "Sony",
+  "camera_model": "ILME-FX6",
+  "encoding": "S-Log3",
+  "gamut": null,
+  "candidates": [],
+  "note": "Candidate discovery is not transform approval."
+}
+```
+
+The endpoint can also read explicit make, model, transfer/gamma and gamut
+values from `metadata_tags`. It does **not** interpret container/codec
+`color_primaries` (for example BT.2020) as proof of a camera gamut. Sony
+S-Log3 recordings may require the operator to confirm S-Gamut3 versus
+S-Gamut3.Cine. Missing manufacturer, missing model, missing gamut and unknown
+combinations remain unresolved rather than being guessed.
+
+Possible statuses include `needs_camera_make`, `no_exact_candidate`,
+`needs_camera_model`, `needs_gamut_confirmation`,
+`candidate_unvalidated` and `reference_validated_candidate`. Even the last
+status only means that a matching registry candidate has a passing independent
+reference-validation record; the endpoint itself still returns
+`selection_made: false`. Invalid non-object JSON or invalid metadata types
+return HTTP 422.
+
+**Current Sony validation boundary:** FX3, FX6 and FX9 model-specific
+S-Log3/S-Gamut3 and S-Log3/S-Gamut3.Cine candidates are discoverable, but the
+associated reference-vector templates are intentionally empty. They are not
+validated transforms and must not be used for automatic camera conversion
+until measured, traceable reference vectors pass the validation workflow.
