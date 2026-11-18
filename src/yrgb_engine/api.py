@@ -1403,6 +1403,60 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             for temporary_path in temporary_paths:
                 Path(temporary_path).unlink(missing_ok=True)
 
+
+    @app.post("/v1/media/align-compare")
+    async def media_align_compare(
+        reference: UploadFile = File(...),
+        candidate: UploadFile = File(...),
+    ) -> dict[str, Any]:
+        """Register a candidate still image to a reference and compare overlap RGB samples."""
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+        from .shot_comparison import ShotAlignmentError, align_and_compare
+
+        temporary_paths: list[str] = []
+        uploads = (reference, candidate)
+        try:
+            decoded = []
+            for upload in uploads:
+                filename = Path(upload.filename or "image.bin").name
+                suffix = Path(filename).suffix[:16]
+                total = 0
+                with tempfile.NamedTemporaryFile(prefix="yrgb-align-", suffix=suffix, delete=False) as temp:
+                    temporary_paths.append(temp.name)
+                    while chunk := await upload.read(CHUNK_BYTES):
+                        total += len(chunk)
+                        if total > MAX_UPLOAD_BYTES:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"{filename} exceeds the 512 MiB per-image limit.",
+                            )
+                        temp.write(chunk)
+                if total == 0:
+                    raise HTTPException(status_code=400, detail=f"{filename} is empty.")
+                try:
+                    frame = await run_in_threadpool(decode_oiio_float, temporary_paths[-1])
+                except HighPrecisionDecodeError as exc:
+                    raise HTTPException(status_code=422, detail=f"{filename}: {exc}") from exc
+                if frame.width * frame.height > 40_000_000:
+                    raise HTTPException(status_code=413, detail=f"{filename} exceeds 40 megapixels.")
+                decoded.append(frame)
+
+            try:
+                result = await run_in_threadpool(align_and_compare, decoded[0], decoded[1])
+            except ShotAlignmentError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            result["reference_filename"] = Path(reference.filename or "reference").name
+            result["candidate_filename"] = Path(candidate.filename or "candidate").name
+            return result
+        finally:
+            for upload in uploads:
+                await upload.close()
+            for temporary_path in temporary_paths:
+                Path(temporary_path).unlink(missing_ok=True)
+
     return app
 
 
