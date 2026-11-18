@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
 
 import PyOpenColorIO as ocio
 
@@ -27,8 +28,10 @@ def main() -> int:
         error = None
         if source_exists and destination_exists:
             try:
-                config.getProcessor(source, destination).getDefaultCPUProcessor()
-                processor_ok = True
+                processor = config.getProcessor(source, destination).getDefaultCPUProcessor()
+                sample = [0.18, 0.18, 0.18]
+                processor.applyRGB(sample)
+                processor_ok = all(isfinite(value) for value in sample)
             except Exception as exc:  # OCIO provides config-specific exception types.
                 error = str(exc)
         else:
@@ -41,7 +44,7 @@ def main() -> int:
             "source_available": source_exists,
             "destination_space": destination,
             "destination_available": destination_exists,
-            "processor_builds": processor_ok,
+            "processor_builds_and_runs": processor_ok,
             "candidate_only": profile.get("status") != "verified",
             "error": error,
         })
