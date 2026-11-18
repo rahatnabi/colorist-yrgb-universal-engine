@@ -165,9 +165,14 @@
       "encoding": "D-Log",
       "gamut": "D-Gamut",
       "generation": null,
-      "transform_id": null,
+      "transform_id": "aces-v4.0.0.dji.dlog.dgamut.to-davinci-intermediate-widegamut",
       "status": "unverified",
-      "notes": "DJI D-Log paired with D-Gamut. Keep distinct from D-Log M and D-Log2; confirm exact camera model and recording mode."
+      "notes": "DJI D-Log paired with D-Gamut. Keep distinct from D-Log M and D-Log2; confirm exact camera model and recording mode. Candidate transform mapping from the official ACES v4.0.0 release notes; exact OCIO space name must be confirmed against the pinned Studio config and remains unverified.",
+      "ocio_source_space": "DJI D-Log D-Gamut",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "dji.dlogm",
