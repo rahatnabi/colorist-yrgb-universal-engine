@@ -687,3 +687,61 @@ def test_video_roi_temporal_report_rejects_more_than_240_samples():
     )
     assert response.status_code == 422
 
+
+
+def test_still_analyze_exposes_waveform_and_vectorscope_only_when_standard_selected(monkeypatch):
+    from yrgb_engine.precision import PrecisionFrame
+
+    def fake_decode(_path):
+        return PrecisionFrame.from_interleaved(
+            width=2, height=1, channel_names=("R", "G", "B"),
+            values=[0.1, 0.2, 0.3, 0.7, 0.6, 0.5],
+            source_path="fixture", decoder="test-decoder",
+            sample_domain="test_encoded_values",
+        )
+
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/analyze?scope_standard=bt709",
+        files={"file": ("sample.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 200
+    analysis = response.json()["analysis"]
+    assert analysis["scope_standard"] == "bt709"
+    assert analysis["waveform"]["width"] == 128
+    assert analysis["waveform"]["height"] == 96
+    assert len(analysis["vectorscope_points"]) == 2
+    assert "manually selected BT709 coefficients" in analysis["scope_note"]
+
+
+def test_video_frame_exposes_manual_bt2020_scopes(monkeypatch):
+    from yrgb_engine.precision import PrecisionFrame
+
+    def fake_decode(_path, *, timestamp_seconds=0.0):
+        return PrecisionFrame.from_interleaved(
+            width=1, height=1, channel_names=("R", "G", "B"),
+            values=[0.2, 0.4, 0.8], source_path="fixture",
+            decoder="test-ffmpeg", sample_domain="test_video_source_values",
+        )
+
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-frame?scope_standard=bt2020",
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 200
+    analysis = response.json()["analysis"]
+    assert analysis["scope_standard"] == "bt2020"
+    assert analysis["waveform"] is not None
+    assert len(analysis["vectorscope_points"]) == 1
+
+
+def test_invalid_scope_standard_is_rejected():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/analyze?scope_standard=rec709",
+        files={"file": ("sample.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 422
