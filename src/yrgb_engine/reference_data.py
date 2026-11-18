@@ -49,10 +49,15 @@ def load_reference_manifest(path: str | Path) -> dict[str, Any]:
     required_text = (
         "profile_id", "transform_id", "source_space", "destination_space",
         "reference_set_id", "reference_source", "measurement_method",
+        "camera_model", "recording_mode", "codec",
     )
     for field in required_text:
         if not isinstance(payload.get(field), str) or not payload[field].strip():
             raise ReferenceManifestError(f"Reference manifest requires non-empty {field}.")
+
+    bit_depth = payload.get("bit_depth")
+    if isinstance(bit_depth, bool) or not isinstance(bit_depth, int) or bit_depth <= 0:
+        raise ReferenceManifestError("Reference manifest requires a positive integer bit_depth.")
 
     raw_vectors = payload.get("vectors")
     if not isinstance(raw_vectors, list) or not raw_vectors:
