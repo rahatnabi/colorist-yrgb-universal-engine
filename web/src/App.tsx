@@ -9,8 +9,9 @@ type Profile = { id: string; manufacturer: string; encoding: string; gamut?: str
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
 type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
-type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }> };
-type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; frames: VideoSampleFrame[]; note: string };
+type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }> };
+type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
+type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -206,12 +207,19 @@ export default function App() {
                   }}>Analyze sequence</button>
                 </div>
                 {sampleReport && <div className="sample-report">
-                  <div className="sample-report-summary"><b>{sampleReport.frame_count} frames analyzed</b><span>{sampleReport.frames.filter(frame => frame.shot_change_candidate).length} change candidates</span></div>
+                  <div className="sample-report-summary"><b>{sampleReport.frame_count} frames analyzed</b><span>{sampleReport.shot_groups.length} provisional shot groups</span></div>
+                  <div className="shot-group-list">{sampleReport.shot_groups.map(group => <div className="shot-group-card" key={group.shot_index}>
+                    <b>SHOT {String(group.shot_index + 1).padStart(2, "0")}</b>
+                    <span>Frames {group.start_frame_index + 1}–{group.end_frame_index + 1}</span>
+                    <span>{group.start_seconds.toFixed(2)}s–{group.end_seconds.toFixed(2)}s</span>
+                    {group.boundary_candidate ? <small>PROVISIONAL BOUNDARY · Δ {group.boundary_histogram_distance?.toFixed(3)}</small> : <small>INITIAL GROUP</small>}
+                  </div>)}</div>
                   <div className="sample-frame-list">{sampleReport.frames.map(frame => <div className="sample-frame-row" key={frame.frame_index}>
-                    <span>#{String(frame.frame_index + 1).padStart(2, "0")} · {frame.timestamp_seconds.toFixed(2)}s</span>
+                    <span>SHOT {frame.shot_index + 1} · #{String(frame.frame_index + 1).padStart(2, "0")} · {frame.timestamp_seconds.toFixed(2)}s</span>
                     <span>Δ histogram {frame.histogram_distance === null ? "—" : frame.histogram_distance.toFixed(3)}</span>
                     {frame.shot_change_candidate ? <b className="candidate-flag">CHANGE CANDIDATE</b> : <small>—</small>}
                   </div>)}</div>
+                  <div className="consistency-unavailable"><b>Consistency diagnostics</b><span>Exposure drift: requires validated linear RGB + selected ROI</span><span>Neutral region: requires validated linear RGB</span><span>Mixed-camera match: requires common validated working space</span></div>
                   <p>{sampleReport.note}</p>
                 </div>}
               </div>}
