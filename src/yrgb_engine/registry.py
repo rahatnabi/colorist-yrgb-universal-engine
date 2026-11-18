@@ -109,7 +109,19 @@ class ProfileRegistry:
             and bool(record.get("output_primaries"))
             and has_validation
         )
+        has_mapping = all(
+            isinstance(record.get(field), str) and bool(record[field].strip())
+            for field in (
+                "transform_id", "ocio_source_space", "ocio_destination_space",
+                "output_transfer", "output_primaries",
+            )
+        )
         record["usable_for_transform"] = usable
+        record["transform_mapping_status"] = (
+            "mapped_unvalidated" if has_mapping and not has_validation
+            else "reference_validated" if usable
+            else "mapping_unavailable"
+        )
         record["validation_status"] = (
             "reference_validated" if has_validation else "not_reference_validated"
         )
