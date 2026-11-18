@@ -12,6 +12,7 @@ from typing import Any
 from dataclasses import asdict
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -340,6 +341,46 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             await file.close()
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
+
+    @app.post("/v1/lut/export")
+    async def export_cube_lut(
+        file: UploadFile = File(...),
+        size: int = Query(default=33, ge=2, le=65),
+        title: str = Query(default="COLORIST YRGB Look", min_length=1, max_length=120),
+    ) -> Response:
+        """Resample an uploaded .cube look into a standard 3D LUT grid."""
+        filename = Path(file.filename or "look.cube").name
+        try:
+            if Path(filename).suffix.lower() != ".cube":
+                raise HTTPException(status_code=415, detail="Upload a .cube LUT source file.")
+            raw = await file.read(MAX_UPLOAD_BYTES + 1)
+            if len(raw) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="LUT upload exceeds the 512 MiB limit.")
+            if not raw:
+                raise HTTPException(status_code=400, detail="Uploaded LUT is empty.")
+            from .cube import CubeLUTError, parse_cube_text
+            from .cube_export import CubeExportError, SUPPORTED_3D_SIZES, resample_cube_text
+
+            if size not in SUPPORTED_3D_SIZES:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Unsupported LUT size. Choose one of {SUPPORTED_3D_SIZES}.",
+                )
+            try:
+                source_lut = parse_cube_text(raw.decode("utf-8-sig"))
+                exported = await run_in_threadpool(
+                    resample_cube_text, source_lut, size=size, title=title
+                )
+            except (UnicodeDecodeError, CubeLUTError, CubeExportError) as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            safe_name = "".join(c for c in title if c.isalnum() or c in "-_ ").strip().replace(" ", "_") or "YRGB_Look"
+            return Response(
+                content=exported,
+                media_type="text/plain; charset=utf-8",
+                headers={"Content-Disposition": f'attachment; filename="{safe_name}_{size}pt.cube"'},
+            )
+        finally:
+            await file.close()
 
     return app
 
