@@ -26,15 +26,14 @@ def make_frame(rgb, *, validated=True, transfer="linear"):
 
 def test_neutral_18_percent_roi_scores_full_correction_accuracy():
     frame = make_frame([0.18, 0.18, 0.18])
-    result = measure_correction_accuracy(
-        frame, PixelRegion(0, 0, 2, 1), AccuracyTarget()
-    )
+    result = measure_correction_accuracy(frame, PixelRegion(0, 0, 2, 1))
     assert result.measurement.measured_exposure_stops == pytest.approx(0.0, abs=1e-6)
     assert result.measurement.measured_neutral_spread == pytest.approx(0.0, abs=1e-6)
+    assert result.measurement.measured_white_balance == pytest.approx((0.0, 0.0, 0.0), abs=1e-6)
     assert result.score.label == "correction_accuracy"
     assert result.score.status == "scored"
     assert result.score.score == 100.0
-    assert len(result.score.components) == 2
+    assert len(result.score.components) == 4
 
 
 def test_exposure_deviation_reduces_correction_score():
@@ -48,13 +47,41 @@ def test_exposure_deviation_reduces_correction_score():
     assert exposure.score == 0.0
 
 
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"validated": False},
-        {"transfer": "unknown"},
-    ],
-)
+def test_white_balance_channel_deviation_is_measured_and_scored():
+    frame = make_frame([0.20, 0.18, 0.16])
+    result = measure_correction_accuracy(
+        frame, PixelRegion(0, 0, 2, 1),
+        AccuracyTarget(white_balance_tolerance=0.001),
+    )
+    assert result.measurement.measured_white_balance is not None
+    assert result.score.components[1].metric == "white_balance_red_deviation"
+    assert result.score.components[1].score < 100.0
+    assert result.score.components[3].metric == "white_balance_blue_deviation"
+
+
+def test_tonal_structure_is_measured_and_scored_only_with_exercise_targets():
+    frame = make_frame([0.18, 0.18, 0.18])
+    target = AccuracyTarget(
+        shadow_threshold=0.1,
+        highlight_threshold=0.8,
+        shadow_fraction_target=0.0,
+        highlight_fraction_target=0.0,
+    )
+    result = measure_correction_accuracy(frame, PixelRegion(0, 0, 2, 1), target)
+    assert result.measurement.tonal_shadow_fraction == 0.0
+    assert result.measurement.tonal_highlight_fraction == 0.0
+    assert len(result.score.components) == 6
+    assert result.score.score == 100.0
+
+
+def test_tonal_targets_must_be_complete():
+    frame = make_frame([0.18, 0.18, 0.18])
+    target = AccuracyTarget(shadow_threshold=0.1)
+    with pytest.raises(ValueError, match="both thresholds and both target fractions"):
+        measure_correction_accuracy(frame, PixelRegion(0, 0, 2, 1), target)
+
+
+@pytest.mark.parametrize("kwargs", [{"validated": False}, {"transfer": "unknown"}])
 def test_unvalidated_source_cannot_receive_accuracy_score(kwargs):
     frame = make_frame([0.18, 0.18, 0.18], **kwargs)
     with pytest.raises(ValueError, match="validated"):
@@ -77,4 +104,13 @@ def test_invalid_luminance_coefficients_are_rejected():
         measure_correction_accuracy(
             frame, PixelRegion(0, 0, 2, 1),
             AccuracyTarget(luminance_coefficients=(1.0, 1.0, 1.0)),
+        )
+
+
+def test_invalid_white_balance_target_is_rejected():
+    frame = make_frame([0.18, 0.18, 0.18])
+    with pytest.raises(ValueError, match="finite"):
+        measure_correction_accuracy(
+            frame, PixelRegion(0, 0, 2, 1),
+            AccuracyTarget(white_balance_target=(0.0, float("nan"), 0.0)),
         )
