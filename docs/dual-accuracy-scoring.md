@@ -1,6 +1,6 @@
 # COLORIST YRGB — Dual Accuracy Scoring
 
-Status: **scoring foundation + first image-measurement integration**. Correction Accuracy can now be calculated from an explicitly selected ROI on a validated linear-RGB PrecisionFrame. Raw decoder output remains ineligible until a validated color transform is applied.
+Status: **validated image-measurement integration for exposure, neutral-ROI white balance, and optional tonal fractions**. The scoring path accepts only explicitly validated linear-RGB PrecisionFrames.
 
 ## Product rule
 
@@ -9,93 +9,43 @@ Every exercise may report two independent results:
 1. **Correction Accuracy** — objective technical correction against declared, measurable targets.
 2. **Creative Look Similarity** — perceptual similarity to an explicitly selected creative reference.
 
-Never combine these into one headline score. A learner may correct an image accurately and intentionally create a different look; that must not reduce the correction score.
+Never combine these into one headline score.
 
 ## 1. Correction Accuracy
 
-Only score criteria that the exercise explicitly defines and that can be measured from the supplied reference/target data.
+### Exposure
+A learner- or exercise-selected ROI is measured in validated linear-light RGB. Mean luminance is compared with the exercise's declared gray reference in stops. No gray card or target exposure is inferred.
 
-Candidate criteria:
+### White balance
+The same explicitly selected neutral ROI is measured for per-channel balance. Red, green and blue channel deviations from the exercise's declared neutral target are scored independently, then weighted as one white-balance family. The ROI must genuinely be neutral; the engine cannot determine that from RGB values alone.
 
-- Exposure / luminance deviation, in stops, only in a declared linear-light or otherwise validated measurement domain.
-- White-balance / neutral-region chromaticity deviation, using a declared neutral ROI.
-- RGB balance deviation in a declared common working space.
-- Tonal-structure deviation across configured shadow, midtone and highlight regions.
-- Optional color-patch or selected-ROI difference, after both images have valid transforms into the same comparison space.
+### Tonal structure
+The full frame is measured for shadow and highlight pixel fractions using exercise-defined thresholds in the declared linear-luminance domain. These fractions are scored only when the exercise supplies both thresholds and both target fractions. This is a compact tonal-distribution measure, not a complete artistic contrast judgement or a substitute for a calibrated display-referred waveform.
 
-Each exercise supplies its own target values, ROI masks, criterion weights and tolerance bands. Do not infer a neutral patch, 18% gray card, skin ROI, or target exposure when the exercise has not supplied one.
+The measurement also reports luminance percentiles (1st, 10th, 50th, 90th, 99th) for diagnostics. Percentiles are not yet scored against a reference curve.
 
-### Criterion scoring
+### Scoring
+Each exercise supplies its own target values, ROI, thresholds, weights and tolerances. For an error e, tolerance tau, and exercise falloff k:
 
-For a measured error e, target t, and exercise-defined tolerance τ, the criterion score is:
+- 100 when e <= tau.
+- Otherwise max(0, 100 * (1 - (e - tau) / (k * tau))).
 
-- 100 when e <= τ.
-- Otherwise, max(0, 100 * (1 - (e - τ) / (k * τ))), where k is a documented exercise-level falloff factor.
+Required measurements that are unavailable make the report not_scored. No inferred targets, hidden fallback weights, or automatic grade changes are permitted.
 
-This is a transparent training rubric, not a universal perceptual law. The exercise author must set and document τ and k; do not silently apply one global tolerance to every image or camera.
+The current upload decoder still marks source output uncharacterized; decoded uploads do not receive this score automatically until a validated transform is applied.
 
-The Correction Accuracy score is the weighted mean of valid criterion scores. If a required criterion cannot be measured, return not_scored with a reason rather than guessing or silently redistributing its weight. Optional criteria may be omitted only when the exercise definition marks them optional.
+## 2. Creative Look Similarity
 
-### Current Correction Accuracy integration\n\n`src/yrgb_engine/accuracy.py` connects the validated linear-light ROI measurement in `exposure.py` to the independent `correction_accuracy` score in `scoring.py`. It currently measures exposure deviation from the exercise target and neutral channel spread. The exercise must provide the ROI, luminance coefficients, gray reference, tolerances and weights. A validated `working_space_id` and `transform_id` are mandatory. Synthetic tests cover neutral 18% gray, exposure deviation, invalid pipeline metadata and invalid coefficients.\n\nThis is the first vertical slice, not a complete correction rubric: tonal-structure targets, additional WB/chromaticity metrics, a public API endpoint, grading-workspace UI and report export remain future work. The current OpenImageIO decoder deliberately marks its output as uncharacterized, so decoded uploads do not receive this score automatically.\n\n## 2. Creative Look Similarity
+This remains a separate future implementation. It requires validated color-managed reference and candidate images, reliable alignment/masks, and pixelwise perceptual color comparison such as CIEDE2000 (Delta E 00). Existing decoded-RGB diagnostics or mean-Lab Delta E 76 must not be presented as Delta E 00.
 
-This score compares the learner's exported/rendered still with a designated target-look reference. It is not a judgement of whether the creative choice is aesthetically good.
+## 3. UI rules
 
-Required conditions:
-
-- Both images are decoded correctly.
-- Both are transformed using known, validated color-management paths into the same comparison space and viewing/display condition.
-- Alignment is reliable and the comparison mask excludes invalid/non-overlapping pixels.
-- Any resizing, crop, ROI weighting and alpha handling are declared and reproducible.
-
-Recommended comparison signals:
-
-- Pixel/ROI perceptual color difference using **CIEDE2000 (ΔE00)** in an appropriate Lab comparison domain.
-- Luminance / tonal-distribution similarity.
-- Hue and chroma distribution similarity.
-- Optional region-weighted similarity for important areas such as subject, background or skin, only when masks are supplied or explicitly approved.
-
-Do not use the current decoded-RGB sample-difference or mean-Lab ΔE76 diagnostic as if it were a validated ΔE00 creative similarity score. Mean RGB converted once to Lab is not equivalent to pixelwise perceptual comparison.
-
-### Similarity scoring
-
-The exercise defines the metric weights, ROI weights, and acceptable error ranges. Convert each metric to a 0–100 score using documented exercise-specific thresholds, then calculate a weighted mean. The report must expose the component scores and measured errors so the learner can understand the result.
-
-Creative Look Similarity is not_scored if colorimetry, display condition, alignment, or required reference metadata is not verified. Do not invent a similarity percentage.
-
-## 3. Result contract
-
-Each score returns:
-
-- status: scored or not_scored
-- score: number from 0 to 100, or null
-- label: Correction Accuracy or Creative Look Similarity
-- components: per-metric measured value, target, error, tolerance, weight and component score
-- color_pipeline: source/reference IDs, working/comparison space, transforms and validation state
-- limitations: concise explanation of any excluded data or assumptions
-
-A not_scored result must include a learner-readable reason and the action needed to make it measurable.
-
-## 4. UI rules
-
-- Show the two scores side by side, never as a blended total.
-- Clearly label a demonstration/example score as illustrative.
-- Show component-level feedback and the largest correctable deviations.
-- Preserve the learner's creative grade; scoring must not automatically alter pixels or grading controls.
-- Export the two results independently in the grading report.
-
-## 5. Implementation sequence
-
-1. Define exercise target/ROI/weight schema.
-2. Implement a deterministic scoring module with unit tests for tolerances, missing data, invalid transforms and score bounds.
-3. Add validated pixelwise ΔE00 support; keep current ΔE76 diagnostics explicitly labelled.
-4. Add a score-report API contract.
-5. Connect the report to the still-image grading workspace and export.
-6. Validate against synthetic color patches and a curated, color-managed real-image set.
+- Show Correction Accuracy and Creative Look Similarity separately.
+- Show component-level exposure, white-balance and tonal feedback.
+- Label tonal fractions and thresholds; do not present them as universal clipping limits.
+- Preserve the learner's grade; scoring never modifies pixels or controls.
+- A score is not_scored when required pipeline or reference data is unverified.
 
 ## Explicit non-goals
 
-- No single universal score for every image or creative style.
-- No AI aesthetic judgement presented as objective accuracy.
-- No score based solely on unverified decoded RGB values.
-- No automatic grading adjustment based on the score.
-- No video or temporal scoring.
+No video or temporal scoring, no universal aesthetic score, no inferred gray card/skin ROI, and no score based on unverified decoded RGB.
