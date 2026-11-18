@@ -602,7 +602,15 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     for item in output:
                         if group.start_frame_index <= item["frame_index"] <= group.end_frame_index:
                             item["shot_index"] = group.shot_index
-                return {"frames": output, "shot_groups": [asdict(group) for group in groups]}
+                from .temporal_diagnostics import analyze_sampled_temporal_trends
+
+                group_payload = [asdict(group) for group in groups]
+                diagnostics = analyze_sampled_temporal_trends(output, group_payload)
+                return {
+                    "frames": output,
+                    "shot_groups": group_payload,
+                    "temporal_diagnostics": diagnostics,
+                }
 
             try:
                 sample_result = await run_in_threadpool(analyze_sample)
@@ -623,6 +631,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 "sample_domain": "source sample-domain; no input transform applied",
                 "frames": frames,
                 "shot_groups": shot_groups,
+                "temporal_diagnostics": sample_result["temporal_diagnostics"],
                 "consistency_status": {
                     "exposure_drift": "unavailable_without_validated_linear_rgb_and_user_roi",
                     "neutral_region": "unavailable_without_validated_linear_rgb",
