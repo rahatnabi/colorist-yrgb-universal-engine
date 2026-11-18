@@ -6,7 +6,18 @@
     {
       "id": "sony.slog3.sgamut3cine",
       "manufacturer": "Sony",
-      "camera_models": [],
+      "camera_models": [
+        "ILME-FX3",
+        "ILME-FX6",
+        "ILME-FX9",
+        "PXW-FX9",
+        "Sony FX3",
+        "Sony FX6",
+        "Sony FX9",
+        "FX3",
+        "FX6",
+        "FX9"
+      ],
       "encoding": "S-Log3",
       "gamut": "S-Gamut3.Cine",
       "generation": null,
@@ -22,7 +33,18 @@
     {
       "id": "sony.slog3.sgamut3",
       "manufacturer": "Sony",
-      "camera_models": [],
+      "camera_models": [
+        "ILME-FX3",
+        "ILME-FX6",
+        "ILME-FX9",
+        "PXW-FX9",
+        "Sony FX3",
+        "Sony FX6",
+        "Sony FX9",
+        "FX3",
+        "FX6",
+        "FX9"
+      ],
       "encoding": "S-Log3",
       "gamut": "S-Gamut3",
       "generation": null,
