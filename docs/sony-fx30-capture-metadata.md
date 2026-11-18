@@ -42,8 +42,12 @@ The exact observed camera/gamma/gamut tuple matches the candidate registry profi
 
 The FX30 model match is useful for identifying the correct candidate profile. It does not authorize conversion or numerical Correction Accuracy. The profile remains blocked until the pinned OCIO transform is compared against independently measured, traceable camera reference patches.
 
-## Remaining capture evidence
+## Still-image-only validation path
 
-For a real still-image transform test, retain an original ungraded frame extracted from the camera original without transcoding or a display LUT. Keep its source metadata alongside it. For production validation, also obtain an independently measured chart/reference set with documented chart identity, camera model, recording settings, codec, bit depth, measurement method, and expected scene-linear values.
+The COLORIST YRGB product processes still images only. No video upload, video decoder, clip timeline, frame-sequence analysis, or video-grading feature is required for this camera-profile task.
 
-A single natural-scene still can test decoding, metadata association, transform execution, and visual plausibility. It cannot by itself establish objective transform accuracy.
+The next test input is one still-image asset containing the original, ungraded S-Log3 / S-Gamut3.Cine pixel values. Prefer a lossless, high-bit-depth still representation (for example, 16-bit TIFF or OpenEXR) with no display/monitor LUT baked in. Preserve the original image's dimensions and attach this XML as sidecar provenance. A screenshot, screen grab, JPEG, or display-transformed export may no longer contain the original camera signal and must not be assumed to be valid S-Log3 source data.
+
+The still-image pipeline should decode that one image, retain its pixel samples and provenance, require explicit source-profile selection, and only apply a transform after its exact source encoding and color metadata are known. The XML identifies the camera capture profile but does not independently prove the pixel encoding of an arbitrary exported still.
+
+For production transform approval, separately obtain an independently measured chart/reference set with documented chart identity, camera model, recording settings, codec, bit depth, measurement method, patch labels, and expected scene-linear values. A natural-scene still can test image decoding, metadata association, transform execution, and visual plausibility; it cannot by itself establish objective transform accuracy.
