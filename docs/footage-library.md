@@ -128,6 +128,10 @@ A state must not be skipped by inference. Each asset may have multiple purpose-s
 - [ ] Usage/redistribution permission recorded.
 - [ ] Any color-transform reference claims supported by separate measured vectors.
 
+## Technical analysis report contract
+
+The conflict-aware report schema and an explicitly unvalidated starter template are available at `data/footage_library/media_analysis_report.schema.json` and `data/footage_library/media_analysis_report.template.json`. The verification rules for source provenance, separate YUV/nonlinear-RGB/linear-RGB domains, legal-range excursions versus hard saturation, and timecode reconciliation are documented in `docs/media-analysis-report-contract.md`. Do not promote the Sony sample to decoded or reference-qualified until original bytes and reproducible evidence are available.
+
 ## Current blocker
 
 The Google Drive folder link is available as a user-provided source reference, but the Drive connector is not available in this workspace and the binary contents have not been fetched. Do not mark this dataset acquired or validated. The next intake step is to obtain the original MP4 and XML bytes through an accessible direct download/share route, then run the checksum and probe pipeline.
