@@ -28,6 +28,7 @@ class ReferenceVector:
 
 @dataclass(frozen=True, slots=True)
 class TransformValidationResult:
+    profile_id: str
     transform_id: str
     source_space: str
     destination_space: str
@@ -51,12 +52,14 @@ class TransformValidationResult:
             "ocio_version": self.ocio_version,
             "source_space": self.source_space,
             "destination_space": self.destination_space,
+            "profile_id": self.profile_id,
             "transform_id": self.transform_id,
         }
 
 
 def validate_reference_vectors(
     *,
+    profile_id: str,
     transform_id: str,
     source_space: str,
     destination_space: str,
@@ -71,7 +74,7 @@ def validate_reference_vectors(
     path = Path(config_path)
     if not path.is_file():
         raise TransformValidationError("A readable, pinned OCIO config file is required.")
-    if not all(value.strip() for value in (transform_id, source_space, destination_space, reference_set_id)):
+    if not all(value.strip() for value in (profile_id, transform_id, source_space, destination_space, reference_set_id)):
         raise TransformValidationError("Transform and reference-set identifiers are required.")
     if not isfinite(tolerance) or tolerance <= 0:
         raise TransformValidationError("Tolerance must be a finite positive value.")
@@ -91,6 +94,8 @@ def validate_reference_vectors(
 
     maximum = max(errors)
     return TransformValidationResult(
+        profile_id=profile_id,
+        profile_id=profile_id,
         transform_id=transform_id,
         source_space=source_space,
         destination_space=destination_space,
@@ -160,12 +165,14 @@ def apply_reference_validated_transform(
         raise TransformValidationError("Reference vectors did not pass; transform remains unverified.")
     if (source_space, destination_space) != (result.source_space, result.destination_space):
         raise TransformValidationError("Requested spaces do not match the validated transform record.")
-    if not result.transform_id.strip() or not result.reference_set_id.strip():
+    if not result.profile_id.strip() or not result.transform_id.strip() or not result.reference_set_id.strip():
         raise TransformValidationError("A complete transform and reference-set identity is required.")
     if not output_transfer.strip():
         raise TransformValidationError("An explicit destination transfer function is required.")
     if not profile_id.strip():
         raise TransformValidationError("An exact camera registry profile ID is required.")
+    if result.profile_id != profile_id:
+        raise TransformValidationError("Validation evidence belongs to a different camera registry profile.")
     if frame.encoding.profile_id != profile_id:
         raise TransformValidationError("Frame camera profile ID does not match the selected registry profile.")
     path = Path(config_path)
