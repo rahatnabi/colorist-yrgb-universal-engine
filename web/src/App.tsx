@@ -182,14 +182,15 @@ export default function App() {
               <div className="media-meta"><div className="file-title">{isVideo ? <Film size={15} /> : <FileImage size={15} />}<b>{file.name}</b></div><span>{formatBytes(file.size)} · {file.type || "Unknown MIME type"}</span>
                 {busy ? <span className="processing"><LoaderCircle size={14} /> Inspecting media metadata…</span> : probe ? <span className="success-line"><CheckCircle2 size={14} /> Probe complete · {probe.probe.status || "unknown"}</span> : null}
               </div>
-              {isImage && <div className="transform-preview-control">
-                <div><b>REFERENCE-GATED COLOR PREVIEW</b><small>{selectedProfileId ? "Selected profile: " + selectedProfileId : "Select an exact camera profile below first."}</small></div>
+              {(isImage || isVideo) && <div className="transform-preview-control">
+                <div><b>REFERENCE-GATED COLOR PREVIEW</b><small>{selectedProfileId ? "Selected profile: " + selectedProfileId : "Select an exact camera profile below first."}{isVideo ? " · Frame at " + frameTimestamp + "s" : ""}</small></div>
                 <button type="button" className="primary-button" disabled={!apiOnline || !selectedProfileId || transformPreviewBusy} onClick={async () => {
                   if (!file || !selectedProfileId) return;
                   setTransformPreviewBusy(true); setTransformPreviewNote("Preparing validated camera transform and preview-only display conversion…");
                   try {
                     const body = new FormData(); body.append("file", file); body.append("profile_id", selectedProfileId);
-                    const response = await fetch(API_BASE + "/v1/media/transform-preview", { method: "POST", body });
+                    const previewEndpoint = isVideo ? "/v1/media/video-transform-preview?timestamp_seconds=" + encodeURIComponent(frameTimestamp) : "/v1/media/transform-preview";
+                    const response = await fetch(API_BASE + previewEndpoint, { method: "POST", body });
                     if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Transform preview failed"); }
                     const blob = await response.blob(); const url = URL.createObjectURL(blob);
                     if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl);
@@ -197,7 +198,7 @@ export default function App() {
                     setTransformPreviewNote("Preview only. Display conversion is not a mastering/export validation.");
                   } catch (err) { setTransformPreviewNote(err instanceof Error ? err.message : "Transform preview failed"); }
                   finally { setTransformPreviewBusy(false); }
-                }}>{transformPreviewBusy ? "Preparing…" : "Render color-managed preview"}</button>
+                }}>{transformPreviewBusy ? "Preparing…" : isVideo ? "Render selected frame preview" : "Render color-managed preview"}</button>
                 {transformPreviewNote && <p className="profile-note">{transformPreviewNote}</p>}
                 {transformPreviewUrl && <img className="transform-preview-image" src={transformPreviewUrl} alt="Reference-gated color transform preview" />}
               </div>}
