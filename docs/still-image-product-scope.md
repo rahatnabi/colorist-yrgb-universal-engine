@@ -12,7 +12,7 @@ COLORIST YRGB is a still-image inspection, color-analysis, grading and delivery 
 6. Render a reference-gated color-managed preview when a validated transform is available.
 7. Build and export creative looks / LUTs where the selected processing domain is valid.
 8. Analyze bounded still-image batches and compare adjacent images.
-9. Build contact sheets, compare shots, and export image analysis reports (planned milestones).
+9. Build a browser-local contact sheet, compare selected stills side by side, and inspect decoded sample-domain channel mean differences.
 
 ## Image support principles
 
@@ -39,3 +39,12 @@ A feature is not complete merely because it compiles. Each image workflow needs:
 - non-destructive source handling;
 - clear error messages and resource limits;
 - verified export/re-import behavior where applicable.
+
+
+## Contact sheet and shot comparison workspace
+
+The frontend contact sheet creates temporary object URLs for the selected local files and displays browser-decodable previews. It does not upload images just to make thumbnails. Browser preview support varies by format; RAW, EXR, TIFF or other formats may not render in the browser even when the analysis backend can decode them.
+
+The comparison workspace lets the user select two images and view them side by side. After batch analysis, it shows the difference between the selected images' decoded RGB channel means (B − A). These numbers are not exposure stops, white-balance differences, perceptual color distances, or a shot-match score. No image registration, crop alignment, subject tracking, or color-space normalization is performed.
+
+Object URLs are temporary and revoked when the selected image list changes or the component is unmounted. The source files are not modified.
