@@ -218,3 +218,76 @@ def test_failed_reference_record_never_enables_profile():
         },
     }])
     assert registry.get_by_id("test.reference.failed")["usable_for_transform"] is False
+
+
+def test_requested_camera_families_are_in_catalogue():
+    registry = ProfileRegistry.load()
+    profiles = {item["id"]: item for item in registry.list_profiles()}
+    expected = {
+        "insta360.ilog.luna_rec2020",
+        "insta360.ilog.x5_x6_bt2020",
+        "red.log3g12.redwidegamutrgb",
+        "blackmagic.film_gen4.pocket_4k_6k",
+        "blackmagic.film_gen5.bmd_wide_gamut",
+        "nikon.nlog",
+        "dji.dlog",
+    }
+    assert expected.issubset(profiles)
+    assert all(profiles[item]["status"] == "unverified" for item in expected)
+
+
+def test_insta360_ilog_variants_remain_model_specific():
+    registry = ProfileRegistry.load()
+    luna = registry.resolve(
+        manufacturer="Insta360",
+        encoding="I-Log",
+        gamut="Rec.2020",
+        camera_model="Insta360 Luna Pro",
+    )
+    x_series = registry.resolve(
+        manufacturer="Insta360",
+        encoding="I-Log 10-bit",
+        gamut="BT.2020",
+        camera_model="Insta360 X5",
+    )
+    assert luna["id"] == "insta360.ilog.luna_rec2020"
+    assert x_series["id"] == "insta360.ilog.x5_x6_bt2020"
+    assert registry.resolve(
+        manufacturer="Insta360",
+        encoding="I-Log",
+        gamut="Rec.2020",
+        camera_model="Insta360 X5",
+    ) is None
+
+
+def test_pocket_cinema_camera_gen4_and_gen5_are_distinct():
+    registry = ProfileRegistry.load()
+    gen4 = registry.resolve(
+        manufacturer="Blackmagic Design",
+        encoding="Blackmagic Film Gen 4",
+        gamut="Blackmagic Design",
+        camera_model="Blackmagic Pocket Cinema Camera 4K",
+    )
+    gen5 = registry.resolve(
+        manufacturer="Blackmagic Design",
+        encoding="Blackmagic Film Gen 5",
+        gamut="Blackmagic Wide Gamut",
+        camera_model="Blackmagic Pocket Cinema Camera 6K",
+    )
+    assert gen4["id"] == "blackmagic.film_gen4.pocket_4k_6k"
+    assert gen5["id"] == "blackmagic.film_gen5.bmd_wide_gamut"
+    assert gen4["usable_for_transform"] is False
+    assert gen5["usable_for_transform"] is False
+
+
+def test_nikon_dji_and_red_gamut_pairs_are_explicit():
+    registry = ProfileRegistry.load()
+    assert registry.resolve(
+        manufacturer="Nikon", encoding="N-Log", gamut="N-Gamut"
+    )["id"] == "nikon.nlog"
+    assert registry.resolve(
+        manufacturer="DJI", encoding="D-Log", gamut="D-Gamut"
+    )["id"] == "dji.dlog"
+    assert registry.resolve(
+        manufacturer="RED", encoding="Log3G12", gamut="REDWideGamutRGB"
+    )["id"] == "red.log3g12.redwidegamutrgb"
