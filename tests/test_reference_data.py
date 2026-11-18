@@ -130,3 +130,77 @@ def test_reference_manifest_requires_valid_bit_depth(tmp_path):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ReferenceManifestError, match="bit_depth"):
         load_reference_manifest(path)
+
+
+
+def test_camera_specific_registry_rejects_reference_manifest_for_other_model(tmp_path):
+    manifest = _manifest()
+    manifest_path = tmp_path / "reference.json"
+    manifest_path.write_text(json.dumps(manifest))
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine",
+        "manufacturer": "Sony",
+        "encoding": "S-Log3",
+        "gamut": "S-Gamut3.Cine",
+        "camera_models": ["ILME-FX30"],
+        "status": "unverified",
+        "transform_id": "sony.slog3.to.dwg",
+        "ocio_source_space": "S-Log3 S-Gamut3.Cine",
+        "ocio_destination_space": "DaVinci Intermediate WideGamut",
+    }])
+    with pytest.raises(ReferenceManifestError, match="camera_model"):
+        validate_reference_manifest(
+            manifest_path, config_path=tmp_path / "config.ocio", registry=registry
+        )
+
+
+def test_camera_specific_registry_accepts_case_insensitive_exact_model(tmp_path, monkeypatch):
+    manifest = _manifest()
+    manifest["camera_model"] = "ilme-fx6"
+    manifest_path = tmp_path / "reference.json"
+    manifest_path.write_text(json.dumps(manifest))
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine",
+        "manufacturer": "Sony",
+        "encoding": "S-Log3",
+        "gamut": "S-Gamut3.Cine",
+        "camera_models": ["ILME-FX6"],
+        "status": "unverified",
+        "transform_id": "sony.slog3.to.dwg",
+        "ocio_source_space": "S-Log3 S-Gamut3.Cine",
+        "ocio_destination_space": "DaVinci Intermediate WideGamut",
+    }])
+
+    def fake_validate(**kwargs):
+        return TransformValidationResult(
+            profile_id=kwargs["profile_id"],
+            transform_id=kwargs["transform_id"],
+            source_space=kwargs["source_space"],
+            destination_space=kwargs["destination_space"],
+            config_sha256="b" * 64,
+            reference_set_id=kwargs["reference_set_id"],
+            vector_count=len(kwargs["vectors"]),
+            max_absolute_error=0.0,
+            tolerance=kwargs["tolerance"],
+            passed=True,
+            ocio_version="test",
+        )
+
+    monkeypatch.setattr("yrgb_engine.reference_data.validate_ocio_config", fake_validate)
+    result = validate_reference_manifest(
+        manifest_path, config_path=tmp_path / "config.ocio", registry=registry
+    )
+    assert result.passed is True
+
+
+def test_reference_manifest_rejects_duplicate_vector_labels(tmp_path):
+    manifest = _manifest()
+    manifest["vectors"].append({
+        "label": " NEUTRAL-PATCH-18 ",
+        "source_rgb": [0.2, 0.2, 0.2],
+        "expected_rgb": [0.1, 0.1, 0.1],
+    })
+    path = tmp_path / "duplicate-labels.json"
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ReferenceManifestError, match="labels must be unique"):
+        load_reference_manifest(path)
