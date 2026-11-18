@@ -114,3 +114,14 @@ The official ACES v4.0.0 release identifies the Studio config as an OCIO 2.5 con
 
 
 Reference manifests also require exact camera model, recording mode, codec, and bit depth. Firmware version is an optional traceability field. This prevents a measured vector set from being silently reused across materially different camera modes or encodings.
+
+
+## Sony FX3 / FX6 / FX9 capture-specific validation
+
+The Sony S-Log3 family is tracked against three distinct capture targets: **FX3**, **FX6**, and **FX9**. The S-Log3 / S-Gamut3.Cine OCIO candidate is a shared mathematical transform candidate only; this does not imply that every camera mode has been independently validated.
+
+The media probe exposes a `capture_metadata` object sourced only from ffprobe/container tags and stream properties. It records reported camera make/model, recording-mode tags when present, codec, codec profile/tag, pixel format, bit depth, transfer, primaries, matrix, range, and firmware tags. It does not infer a missing camera model, recording mode, S-Log3 curve, or gamut. Pixel-format bit depth is a fallback only when ffprobe does not report an explicit bit-depth field.
+
+For each of FX3, FX6, and FX9, create a separate manifest with the exact model identifier reported by the camera, recording mode, codec/profile, bit depth, firmware, and actual gamut used (S-Gamut3.Cine versus S-Gamut3). Do not assume all three cameras or recording modes share those settings. If container metadata omits recording mode or firmware, capture those values from the camera's recording setup/report and preserve that provenance alongside the reference set.
+
+The current manifest validator requires one exact camera model, recording mode, codec, and bit depth. It validates the selected OCIO transform against supplied measured vectors; it does not itself establish whether camera metadata is genuine or whether reference measurements are traceable. The three camera-specific reference sets therefore remain pending until independently measured values and provenance are supplied.
