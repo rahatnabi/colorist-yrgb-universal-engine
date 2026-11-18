@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -66,7 +67,7 @@ def save_submission(
         image_path = str(destination)
         safe_filename = Path(image_filename or "still-image").name[:180]
     created_at = datetime.now(timezone.utc).isoformat()
-    with _connect() as connection:
+    with _database() as connection:
         connection.execute(
             """INSERT INTO submissions
             (id, learner_id, exercise_id, evidence, image_path, image_filename,
