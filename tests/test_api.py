@@ -174,3 +174,40 @@ def test_video_sample_endpoint_rejects_more_than_24_frames():
         files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
     )
     assert response.status_code == 422
+
+
+def test_lut_export_endpoint_resamples_cube_to_requested_size():
+    source = (
+        "TITLE \"Tiny identity\"\\nLUT_3D_SIZE 2\\n"
+        "0 0 0\\n1 0 0\\n0 1 0\\n1 1 0\\n"
+        "0 0 1\\n1 0 1\\n0 1 1\\n1 1 1\\n"
+    )
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/lut/export?size=35&title=Test Look",
+        files={"file": ("source.cube", source, "text/plain")},
+    )
+    assert response.status_code == 200
+    assert 'filename="Test_Look_35pt.cube"' in response.headers["content-disposition"]
+    from yrgb_engine.cube import parse_cube_text
+    parsed = parse_cube_text(response.text)
+    assert parsed.size_3d == 35
+    assert len(parsed.values_3d) == 35 ** 3
+
+
+def test_lut_export_endpoint_rejects_non_cube_upload():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/lut/export?size=35",
+        files={"file": ("look.png", b"not a lut", "image/png")},
+    )
+    assert response.status_code == 415
+
+
+def test_lut_export_endpoint_rejects_unsupported_grid_size():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/lut/export?size=64",
+        files={"file": ("look.cube", b"LUT_3D_SIZE 2", "text/plain")},
+    )
+    assert response.status_code == 422
