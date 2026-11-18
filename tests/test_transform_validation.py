@@ -90,3 +90,34 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
             frame, passed, source_space="CameraLog", destination_space="DWG-Linear",
             config_path=config, output_transfer="linear",
         )
+
+
+def test_apply_marks_frame_validated_only_after_matching_reference_record(tmp_path, monkeypatch):
+    config = tmp_path / "config.ocio"
+    config.write_text("config-v1")
+    result = validate_reference_vectors(
+        transform_id="camera-to-dwg",
+        source_space="CameraLog",
+        destination_space="DWG-Linear",
+        config_path=config,
+        reference_set_id="vendor-patches-v1",
+        vectors=_vectors(),
+        evaluate_rgb=lambda rgb: rgb,
+    )
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.1, 0.2, 0.3), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(profile_id="CameraLog"),
+    )
+    monkeypatch.setattr(
+        "yrgb_engine.transform_validation.transform_frame",
+        lambda source, **_kwargs: source,
+    )
+    transformed = apply_reference_validated_transform(
+        frame, result, source_space="CameraLog", destination_space="DWG-Linear",
+        config_path=config, output_transfer="linear",
+    )
+    assert transformed.encoding.validated is True
+    assert transformed.encoding.working_space_id == "DWG-Linear"
+    assert transformed.encoding.transform_id == "camera-to-dwg"
+    assert transformed.metadata["yrgb_transform_validation"]["reference_set_id"] == "vendor-patches-v1"
