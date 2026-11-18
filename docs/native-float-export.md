@@ -37,3 +37,13 @@ The digest is calculated before container encoding; it is not a claim that every
 ## Runtime requirement
 
 Install the `high-precision` optional dependencies (`OpenImageIO` and `NumPy`) on the API server. Export tests use a controlled fake writer and do not replace integration testing against the actual OpenImageIO TIFF and OpenEXR plugins.
+
+## Round-trip verification
+
+After writing a TIFF or OpenEXR master, the engine reopens the file with OpenImageIO and reads it back as float32. It checks dimensions, channel count and channel names, then compares every sample against the original graded frame using:
+
+`allowed_error = absolute_tolerance + relative_tolerance × abs(source_sample)`
+
+Defaults are absolute tolerance `1e-7` and relative tolerance `1e-6`. An export that exceeds tolerance is rejected and is not returned as a successful master. The API reports sample count, maximum absolute error, RMSE and whether the read-back sample digest matches the in-memory float32 frame.
+
+This verifies the actual output file rather than merely trusting the writer call. It does not certify colorimetric correctness of the camera input transform or the monitor/display transform; those remain separate validation responsibilities.
