@@ -50,3 +50,18 @@ isolated media workers with CPU/time limits.
 ## Browser development CORS
 
 The API allows `http://localhost:5173` by default for local Vite development. Set `YRGB_CORS_ORIGINS` to a comma-separated allowlist of exact trusted origins when deploying the API. Credentials are disabled. Do not use a wildcard origin in a production deployment.
+
+
+## Bounded temporal video sampling
+
+`POST /v1/media/video-sample?start_seconds=0&interval_seconds=1&frame_count=8`
+decodes evenly spaced frames sequentially and returns per-frame channel means,
+adjacent-frame histogram distance, and statistical shot-change candidates.
+Frame count is limited to 1–24; interval must be greater than 0 and at most
+60 seconds; start time is limited to 0–86,400 seconds. The optional
+`shot_change_threshold` is in the 0–1 range and defaults to 0.35.
+
+This is bounded sampling, not real-time playback or a full-frame-rate scan.
+Histogram changes are candidates, not confirmed semantic cuts. Channel mean
+deltas remain in the source sample domain and are not exposure-stop measurements.
+The upload remains limited to 512 MiB and each decoded frame to 40 MP.
