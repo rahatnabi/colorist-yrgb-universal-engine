@@ -133,7 +133,7 @@ def _image_metadata(path: Path) -> dict[str, Any]:
     try:
         with Image.open(path) as image:
             exif = image.getexif()
-            tags = {str(key): value for key, value in exif.items()}
+            tags = {str(key): str(value) for key, value in exif.items()}
             make, model = exif.get(271), exif.get(272)
             def text_value(value: Any) -> str | None:
                 if value is None:
