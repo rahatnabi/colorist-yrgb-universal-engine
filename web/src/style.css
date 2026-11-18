@@ -83,3 +83,14 @@
 .vectorscope-point{fill:#b8d68d;opacity:.7}
 .scope-method-note{margin-top:10px}
 @media(max-width:620px){.scope-toolbar{width:100%;align-items:stretch}.scope-toolbar label{flex:1}.scope-toolbar select{width:100%}}
+
+
+/* Per-scope controls and monitoring actions */
+.scope-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:26px;margin:0 0 7px}
+.scope-controls label{display:flex;align-items:center;gap:6px;color:#929d89;font-size:8px;letter-spacing:.7px}
+.scope-controls select{border:1px solid #394336;border-radius:4px;padding:4px 7px;background:#101410;color:#dbe4d2;font:inherit;font-size:9px;letter-spacing:0}
+.scope-controls input[type=range]{width:78px;accent-color:#a9c67c}
+.scope-control-static{font-size:7px;letter-spacing:.55px;color:#798474}
+.scope-toolbar>button{border:1px solid #536348;border-radius:4px;padding:7px 9px;background:#20281d;color:#c9d8b8;font-size:8px;letter-spacing:.7px;cursor:pointer}
+.scope-toolbar>button:disabled{opacity:.4;cursor:not-allowed}
+.scope-toolbar>button:hover:not(:disabled){border-color:#a9c67c}
