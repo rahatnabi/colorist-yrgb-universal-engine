@@ -26,7 +26,7 @@ def parse_xml_sidecar(path: Path, *, max_bytes: int = 16 * 1024 * 1024) -> dict[
     """Extract simple XML leaf values; do not interpret unknown vendor fields."""
     size = path.stat().st_size
     if size > max_bytes:
-        return {"status": "rejected_size_limit", "size_bytes": size, "values": {}}
+        return {"status": "rejected_size_limit", "size_bytes": size, "max_bytes": max_bytes, "values": {}}
     try:
         root = ET.parse(path).getroot()
     except (ET.ParseError, OSError) as exc:
@@ -63,15 +63,27 @@ def inspect_file(path: Path, *, run_probe: bool = True) -> dict[str, Any]:
             record["status"] = "probed" if result.status == "probed" else result.status
         except ImportError as exc:
             record["probe_error"] = f"YRGB engine is not installed: {exc}"
+            record["status"] = "probe_unavailable"
+        except Exception as exc:  # keep a failed probe visible without losing the checksum
+            record["probe_error"] = f"{type(exc).__name__}: {exc}"
+            record["status"] = "probe_error"
     return record
 
 
 def build_report(paths: list[Path], *, run_probe: bool = True) -> dict[str, Any]:
+    files = [inspect_file(path, run_probe=run_probe) for path in paths]
     return {
         "schema_version": 1,
         "report_type": "yrgb-footage-intake",
         "source_files_modified": False,
-        "files": [inspect_file(path, run_probe=run_probe) for path in paths],
+        "files": files,
+        "summary": {
+            "file_count": len(files),
+            "bytes_acquired_count": sum(item.get("status") != "not_found" for item in files),
+            "probe_error_count": sum(item.get("status") in {"probe_error", "probe_unavailable", "probe_failed", "probe_timeout"} for item in files),
+            "xml_parse_error_count": sum(item.get("sidecar", {}).get("status") == "parse_error" for item in files),
+            "xml_size_rejected_count": sum(item.get("sidecar", {}).get("status") == "rejected_size_limit" for item in files),
+        },
         "limitations": [
             "Container metadata is not proof of a camera Log/gamut profile.",
             "XML leaf values are preserved as vendor metadata; field meanings are not guessed.",
