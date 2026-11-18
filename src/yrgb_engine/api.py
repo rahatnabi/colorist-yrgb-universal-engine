@@ -1320,6 +1320,89 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             if preview_path:
                 Path(preview_path).unlink(missing_ok=True)
 
+    @app.post("/v1/media/batch-analyze")
+    async def media_batch_analyze(
+        files: list[UploadFile] = File(...),
+        scope_standard: str | None = Query(default=None, pattern="^(bt709|bt2020)$"),
+    ) -> dict[str, Any]:
+        """Analyze a bounded still-image sequence and compare sample-domain channel means."""
+        if not 1 <= len(files) <= 24:
+            raise HTTPException(status_code=422, detail="Batch must contain between 1 and 24 images.")
+
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+        from .scope_profiles import get_scope_coefficients
+
+        coefficients = get_scope_coefficients(scope_standard) if scope_standard else None
+        temporary_paths: list[str] = []
+        reports: list[dict[str, Any]] = []
+        try:
+            for index, upload in enumerate(files):
+                filename = Path(upload.filename or f"image-{index + 1}.bin").name
+                suffix = Path(filename).suffix[:16]
+                total = 0
+                with tempfile.NamedTemporaryFile(prefix="yrgb-batch-", suffix=suffix, delete=False) as temp:
+                    temporary_paths.append(temp.name)
+                    while chunk := await upload.read(CHUNK_BYTES):
+                        total += len(chunk)
+                        if total > MAX_UPLOAD_BYTES:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"{filename} exceeds the 512 MiB per-image limit.",
+                            )
+                        temp.write(chunk)
+                if total == 0:
+                    raise HTTPException(status_code=400, detail=f"{filename} is empty.")
+                try:
+                    frame = await run_in_threadpool(decode_oiio_float, temporary_paths[-1])
+                    if frame.width * frame.height > 40_000_000:
+                        raise HTTPException(status_code=413, detail=f"{filename} exceeds 40 megapixels.")
+                    if not all(name.upper() in {c.upper() for c in frame.channel_names} for name in ("R", "G", "B")):
+                        raise HTTPException(status_code=422, detail=f"{filename} does not expose named RGB channels.")
+                    result = await run_in_threadpool(
+                        analyze_frame, frame, histogram_bins=128, scope_width=128, scope_height=96,
+                        value_range=(0.0, 1.0), waveform_coefficients=coefficients,
+                        vectorscope_coefficients=coefficients,
+                    )
+                except HighPrecisionDecodeError as exc:
+                    raise HTTPException(status_code=422, detail=f"{filename}: {exc}") from exc
+                reports.append({
+                    "index": index,
+                    "filename": filename,
+                    "width": frame.width,
+                    "height": frame.height,
+                    "decoder": frame.decoder,
+                    "sample_domain": frame.sample_domain,
+                    "channels": {key: asdict(value) for key, value in result.channels.items()},
+                    "scope_standard": scope_standard,
+                })
+
+            comparisons = []
+            for previous, current in zip(reports, reports[1:]):
+                comparisons.append({
+                    "from_index": previous["index"],
+                    "to_index": current["index"],
+                    "channel_mean_delta": {
+                        channel: current["channels"][channel]["mean"] - previous["channels"][channel]["mean"]
+                        for channel in ("R", "G", "B")
+                    },
+                    "measurement_domain": "decoded_sample_domain_not_linear_light",
+                })
+            return {
+                "image_count": len(reports),
+                "images": reports,
+                "adjacent_comparisons": comparisons,
+                "scope_standard": scope_standard,
+                "comparison_note": (
+                    "Adjacent channel-mean differences are descriptive decoded sample-domain comparisons. "
+                    "They are not exposure stops, luminance differences, or proof of shot matching."
+                ),
+            }
+        finally:
+            for upload in files:
+                await upload.close()
+            for temporary_path in temporary_paths:
+                Path(temporary_path).unlink(missing_ok=True)
+
     return app
 
 
