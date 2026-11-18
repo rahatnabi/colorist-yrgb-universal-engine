@@ -7,8 +7,8 @@ from yrgb_engine.precision import ColorEncoding, PrecisionFrame
 
 def _identity_lut():
     return parse_cube_text(
-        "LUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n"
-        "0 0 1\n1 0 1\n0 1 1\n1 1 1\n"
+        "LUT_3D_SIZE 2\n0 0 0\n0 0 1\n0 1 0\n0 1 1\n"
+        "1 0 0\n1 0 1\n1 1 0\n1 1 1\n"
     )
 
 
