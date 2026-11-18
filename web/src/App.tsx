@@ -10,7 +10,7 @@ type OcioStatus = { configured: boolean; status: string; config_name?: string; o
 type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; validation_status?: string; transform_mapping_status?: string; resolution_note?: string; camera_models?: string[] };
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
-type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
+type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; waveform?: ScopeRaster | null; vectorscope_points?: [number, number][] | null; scope_standard?: "bt709" | "bt2020" | null; scope_note?: string; note: string } };
 type RoiMeasurement = { roi: { x: number; y: number; width: number; height: number; coordinate_space: string }; pixel_bounds: { left: number; top: number; right: number; bottom: number }; pixel_count: number; measurement_domain: string; channels: Record<string, { mean: number }> };
 type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
@@ -22,11 +22,13 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function ScopePanel({ title, subtitle, icon, histograms, parades }: { title: string; subtitle: string; icon: React.ReactNode; histograms?: Record<string, ScopeHistogram>; parades?: Record<string, ScopeRaster> }) {
+function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vectorscopePoints }: { title: string; subtitle: string; icon: React.ReactNode; histograms?: Record<string, ScopeHistogram>; parades?: Record<string, ScopeRaster>; waveform?: ScopeRaster | null; vectorscopePoints?: [number, number][] | null }) {
   const channels = ["R", "G", "B"] as const;
   const hasParade = !!parades && channels.every(channel => !!parades[channel]);
   const hasHistogram = !!histograms && channels.every(channel => !!histograms[channel]);
-  const hasSignal = hasHistogram || hasParade;
+  const hasWaveform = !!waveform;
+  const hasVectorscope = !!vectorscopePoints;
+  const hasSignal = hasHistogram || hasParade || hasWaveform || hasVectorscope;
   return <section className="scope-panel">
     <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
     <div className={"scope-screen" + (hasParade ? " rgb-parade-screen" : "")}><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
@@ -47,9 +49,18 @@ function ScopePanel({ title, subtitle, icon, histograms, parades }: { title: str
           </svg>
         </div>;
       })}</div>
+      : hasWaveform ? <svg className="scope-raster" viewBox={"0 0 " + waveform.width + " " + waveform.height} preserveAspectRatio="none" role="img" aria-label="Luma waveform raster">
+          {waveform.counts.flatMap((column, x) => column.map((count, y) => count > 0 ? <rect key={x + "-" + y} x={x} y={y} width="1" height="1" opacity={Math.min(1, 0.16 + count / 8)} /> : null))}
+        </svg>
+      : hasVectorscope ? <svg className="vectorscope-plot" viewBox="-0.55 -0.55 1.1 1.1" role="img" aria-label="Vectorscope chroma distribution">
+          <circle cx="0" cy="0" r="0.5" className="vectorscope-boundary" />
+          <circle cx="0" cy="0" r="0.25" className="vectorscope-ring" />
+          <path d="M-0.5 0H0.5 M0 -0.5V0.5 M-0.3536 -0.3536L0.3536 0.3536 M-0.3536 0.3536L0.3536 -0.3536" className="vectorscope-axis" />
+          {vectorscopePoints.map((point, index) => <circle key={index} cx={Math.max(-0.5, Math.min(0.5, point[0]))} cy={-Math.max(-0.5, Math.min(0.5, point[1]))} r="0.006" className="vectorscope-point" />)}
+        </svg>
       : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
     </div>
-    <div className="scope-foot">{subtitle}{hasHistogram ? " · R/G/B · 128 bins · under/over R " + histograms.R.underflow + "/" + histograms.R.overflow + " · G " + histograms.G.underflow + "/" + histograms.G.overflow + " · B " + histograms.B.underflow + "/" + histograms.B.overflow : hasParade ? " · R/G/B channels · source range under/over: " + channels.map(channel => parades[channel].underflow + "/" + parades[channel].overflow).join(" · ") : ""}</div>
+    <div className="scope-foot">{subtitle}{hasHistogram ? " · R/G/B · 128 bins · under/over R " + histograms.R.underflow + "/" + histograms.R.overflow + " · G " + histograms.G.underflow + "/" + histograms.G.overflow + " · B " + histograms.B.underflow + "/" + histograms.B.overflow : hasParade ? " · R/G/B channels · source range under/over: " + channels.map(channel => parades[channel].underflow + "/" + parades[channel].overflow).join(" · ") : hasWaveform ? " · Luma-weighted sample values · under/over " + waveform.underflow + "/" + waveform.overflow : hasVectorscope ? " · Cb / Cr sample-domain coordinates · " + vectorscopePoints.length + " plotted samples" : ""}</div>
   </section>;
 }
 
@@ -61,6 +72,7 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
+  const [scopeStandard, setScopeStandard] = useState<"bt709" | "bt2020">("bt709");
   const [frameTimestamp, setFrameTimestamp] = useState("0");
   const [sampleInterval, setSampleInterval] = useState("1");
   const [sampleCount, setSampleCount] = useState("8");
@@ -132,14 +144,14 @@ export default function App() {
       if (imageLike) {
         setAnalysisNote("Decoding high-precision still image for sample-domain scopes…");
         const analysisBody = new FormData(); analysisBody.append("file", selected);
-        const analysisResponse = await fetch(API_BASE + "/v1/media/analyze", { method: "POST", body: analysisBody });
+        const analysisResponse = await fetch(API_BASE + "/v1/media/analyze?scope_standard=" + scopeStandard, { method: "POST", body: analysisBody });
         const analysisData = await analysisResponse.json();
         if (!analysisResponse.ok) setAnalysisNote(analysisData.detail || "Precision decoder unavailable. Install the OpenImageIO extra.");
         else { setAnalysis(analysisData as AnalysisResponse); setAnalysisNote("Decoded by engine. Values are source sample-domain measurements; no input transform or IRE scale is assumed."); }
       } else if (selected.type.startsWith("video/") || /\.(mov|mxf|mp4|mkv|avi)$/i.test(selected.name)) {
         setAnalysisNote("Decoding video frame at 0.0 seconds…");
         const frameBody = new FormData(); frameBody.append("file", selected);
-        const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=0", { method: "POST", body: frameBody });
+        const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=0&scope_standard=" + scopeStandard, { method: "POST", body: frameBody });
         const frameData = await frameResponse.json();
         if (!frameResponse.ok) setAnalysisNote(frameData.detail || "Video frame decoder unavailable. Install FFmpeg and NumPy.");
         else { setAnalysis(frameData as AnalysisResponse); setAnalysisNote("Frame decoded at 0.0s by FFmpeg. Source sample-domain measurements only; no camera transform or IRE scale is assumed."); }
@@ -410,14 +422,15 @@ export default function App() {
           </section>
         </div>
 
-        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div>
+        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => setScopeStandard(event.target.value as "bt709" | "bt2020")}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
-          <ScopePanel title="Waveform" subtitle="Luma / RGB · explicit coefficients required" icon={<Activity size={15} />} />
+          <ScopePanel title="Luma Waveform" subtitle="Luma-weighted · manually selected coefficients · source sample values" icon={<Activity size={15} />} waveform={analysis?.analysis.waveform} />
           <ScopePanel title="RGB Parade" subtitle="Separate R / G / B channel density · decoded source values" icon={<AudioWaveform size={15} />} parades={analysis?.analysis.rgb_parade} />
-          <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source code-value range 0–1" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
-          <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
+          <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source sample range" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
+          <ScopePanel title="Vectorscope" subtitle="Cb / Cr chroma distribution · manually selected coefficients" icon={<Aperture size={15} />} vectorscopePoints={analysis?.analysis.vectorscope_points} />
         </div>
+        {analysis?.analysis.scope_note && <div className="analysis-note scope-method-note">{analysis.analysis.scope_note}</div>}
         <section className="card look-development-card">
           <div className="card-heading"><div><span className="section-kicker">CREATIVE PROCESSING</span><h2>Look Development</h2></div><span className="subtle-tag">LINEAR RGB ENGINE</span></div>
           <p className="lut-export-description">Build a parametric look and bake it directly into a 3D .cube LUT. This first version operates in linear RGB; it does not decode camera Log or perform a Rec.709 display transform.</p>
