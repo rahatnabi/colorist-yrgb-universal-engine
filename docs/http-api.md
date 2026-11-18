@@ -141,3 +141,8 @@ The response is a PNG preview with headers identifying the selected camera profi
 
 
 POST /v1/media/video-transform-preview?timestamp_seconds=... performs the same reference-gated camera-to-working-space preparation on one FFmpeg-decoded video frame, then renders a preview-only PNG. It uses the same explicit profile_id and server-managed OCIO/preview environment settings. The returned timestamp header identifies the sampled frame. This is not continuous playback or video delivery.
+
+
+## OCIO configuration status
+
+`GET /v1/ocio/status` reports whether the server-managed OCIO config can be loaded, its filename and SHA-256, the OCIO version, and whether each mapped camera source space and configured preview destination exists in that config. It does not expose the server's absolute config path and does not certify a camera transform. A color-space name being present is only a configuration compatibility check; the independent reference-validation gate remains mandatory.
