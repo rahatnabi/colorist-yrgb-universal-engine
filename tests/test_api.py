@@ -850,3 +850,93 @@ def test_native_grade_preview_rejects_unknown_camera_profile():
         files={"file": ("still.tif", b"fake-image", "image/tiff")},
     )
     assert response.status_code == 404
+
+
+
+def test_native_grade_preview_uses_shared_pipeline_and_returns_preview_only(tmp_path, monkeypatch):
+    import hashlib
+    from pathlib import Path
+    from types import SimpleNamespace
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "pinned-native.ocio"
+    config.write_text("native-pinned-config")
+    profile_id = "test.linear.camera.profile"
+    transform_id = "test.camera.to.linear"
+    source_space = "Test Camera Log"
+    working_space = "Linear DaVinci WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id,
+        "manufacturer": "Test",
+        "encoding": "Test Log",
+        "gamut": "Test Gamut",
+        "status": "verified",
+        "transform_id": transform_id,
+        "ocio_source_space": source_space,
+        "ocio_destination_space": working_space,
+        "output_transfer": "Linear",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True,
+            "profile_id": profile_id,
+            "transform_id": transform_id,
+            "source_space": source_space,
+            "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-independent-linear-reference",
+            "vector_count": 12,
+            "max_absolute_error": 0.00001,
+            "tolerance": 0.0001,
+            "ocio_version": "test",
+        },
+    }])
+    source = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(),
+    )
+    preview = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(
+            transfer="sRGB", profile_id="Preview sRGB",
+            working_space_id="Preview sRGB", validated=False,
+        ),
+    )
+    seen = {}
+
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", lambda _path: source)
+
+    def fake_pipeline(frame, settings, **kwargs):
+        seen["settings"] = settings
+        seen["working_space"] = kwargs["working_space_id"]
+        return SimpleNamespace(display_preview_frame=preview)
+
+    monkeypatch.setattr("yrgb_engine.grading_pipeline.process_validated_still", fake_pipeline)
+    monkeypatch.setattr(
+        "yrgb_engine.preview.save_preview_png",
+        lambda _frame, path, **_kwargs: Path(path).write_bytes(b"native-preview-fixture") or Path(path),
+    )
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    monkeypatch.setenv("YRGB_PREVIEW_SPACE", "Preview sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_TRANSFER", "sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_PRIMARIES", "BT.709")
+
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-grade-preview",
+        data={
+            "profile_id": profile_id,
+            "exposure_stops": "1.5",
+            "contrast": "1.2",
+            "curve_midpoint": "0.58",
+        },
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.content == b"native-preview-fixture"
+    assert response.headers["x-yrgb-native-grade"] == "float32-linear"
+    assert response.headers["x-yrgb-preview-only"] == "true"
+    assert seen["working_space"] == working_space
+    assert seen["settings"].exposure_stops == pytest.approx(1.5)
+    assert seen["settings"].master_curve == ((0.0, 0.0), (0.5, 0.58), (1.0, 1.0))
