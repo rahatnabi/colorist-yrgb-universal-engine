@@ -1,0 +1,478 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coloristyrgb.example/schemas/media-analysis-report.schema.json",
+  "title": "COLORIST YRGB Media Analysis Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "asset_id",
+    "report_state",
+    "evidence",
+    "color_metadata",
+    "measurement_domains",
+    "timecode",
+    "reference_validation"
+  ],
+  "$defs": {
+    "status": {
+      "enum": [
+        "verified",
+        "reported",
+        "estimated",
+        "conflict",
+        "unresolved",
+        "unavailable",
+        "not_validated"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "reference",
+        "status"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "camera_original",
+            "sidecar_xml",
+            "container_metadata",
+            "decoded_frame",
+            "measurement_csv",
+            "analysis_script",
+            "external_report",
+            "vendor_documentation",
+            "other"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "tool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_index",
+        "sample_count",
+        "channels"
+      ],
+      "properties": {
+        "frame_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "timecode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "min",
+              "max",
+              "mean"
+            ],
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "mean": {
+                "type": "number"
+              },
+              "median": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "std_dev": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "clipping": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "threshold_low": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "threshold_high": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "denominator_samples": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "below_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "above_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "below_fraction": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "above_fraction": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "metric_kind": {
+              "enum": [
+                "legal_range_excursion",
+                "hard_code_saturation",
+                "display_clipping",
+                "unknown"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "description",
+        "numeric_domain",
+        "frames"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "description": {
+          "type": "string"
+        },
+        "numeric_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transfer_function": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "matrix_coefficients": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "range_interpretation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conversion_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame"
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "report_version": {
+      "const": 1
+    },
+    "asset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_state": {
+      "$ref": "#/$defs/status"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "color_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "xml_declared",
+        "stream_signaled",
+        "resolution_status"
+      ],
+      "properties": {
+        "xml_declared": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "stream_signaled": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "resolution_status": {
+          "$ref": "#/$defs/status"
+        },
+        "resolution_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "measurement_domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "original_yuv_code_values",
+        "nonlinear_rgb_code_values",
+        "linear_light_rgb"
+      ],
+      "properties": {
+        "original_yuv_code_values": {
+          "$ref": "#/$defs/domain"
+        },
+        "nonlinear_rgb_code_values": {
+          "$ref": "#/$defs/domain"
+        },
+        "linear_light_rgb": {
+          "$ref": "#/$defs/domain"
+        }
+      }
+    },
+    "timecode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "frame_rate"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "frame_rate": {
+          "type": "string"
+        },
+        "source_start_timecode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mapping_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "frame_index",
+              "calculated_timecode",
+              "source_match"
+            ],
+            "properties": {
+              "frame_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "calculated_timecode": {
+                "type": "string"
+              },
+              "source_timecode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_match": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "temporal_analysis": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "frame_count_analyzed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "scene_cuts": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "exposure_drift_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flicker_method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reference_validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reference_type"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_validated",
+            "decoder_validated",
+            "metadata_confirmed",
+            "reference_validated"
+          ]
+        },
+        "reference_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs_extra": "unused"
+}
