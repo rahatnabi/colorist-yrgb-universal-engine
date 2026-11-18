@@ -92,3 +92,20 @@ until frames have validated linear RGB and a user-selected ROI. Neutral-region
 analysis likewise requires validated linear RGB. Mixed-camera comparison
 requires validated frames in one common working space and explicit colorimetric
 parameters. The current video sampler does not claim any of these prerequisites.
+
+
+## Parametric look-to-LUT export
+
+`POST /v1/look/export-cube` accepts JSON containing `size`, `title`,
+`input_space_id`, `input_transfer` and a `settings` object. The first look
+engine requires an explicitly declared `linear`, `linear-light` or
+`scene-linear` input transfer. It supports exposure stops, contrast, pivot,
+saturation, artistic temperature/tint RGB gains and a monotonic master curve.
+The API returns a baked 3D .cube file at 17, 33, 35 or 65 points.
+
+The engine's temperature/tint controls are artistic channel-gain offsets, not
+Kelvin white balance. The default luma coefficients are Rec.709; callers using
+another linear RGB set must supply appropriate coefficients. This endpoint
+does not decode camera Log, validate a camera transform or create a display
+output transform. Do not label a non-linear DaVinci Intermediate signal as
+linear RGB.
