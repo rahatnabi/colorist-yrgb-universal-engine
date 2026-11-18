@@ -665,8 +665,8 @@ def test_video_roi_temporal_report_returns_dense_fixed_roi_samples(monkeypatch):
     assert payload["temporal_analysis"]["flicker_assessment"]["status"] == "inconclusive"
     assert payload["temporal_analysis"]["exposure_drift_assessment"]["status"] == "unavailable"
     assert len(payload["samples"]) == 24
-    assert payload["samples"][0]["roi_measurement"]["pixel_count"] == 1
-    assert payload["measurement_domain"] == "ffmpeg_rgb_float32_decoder_output"
+    assert payload["samples"][0]["roi_measurement"]["pixel_count"] == 4
+    assert payload["measurement_domain"] == "decoder_float_output"
 
 
 def test_video_roi_temporal_report_rejects_roi_outside_frame():
