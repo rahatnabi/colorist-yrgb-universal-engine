@@ -10,6 +10,7 @@ export type InteractiveLookSettings = {
 export type InteractiveLook = {
   settings: InteractiveLookSettings;
   curve_midpoint: number;
+  working_space_id: "scene-linear-rec709" | "acescg-linear";
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
@@ -41,25 +42,34 @@ export function applyInteractiveLook(
     exposure * 2 ** (-0.35 * temperature_shift),
   ];
   const midpoint = Math.min(0.9, Math.max(0.1, look.curve_midpoint));
+  const aces = look.working_space_id === "acescg-linear";
+  const lumaCoefficients = aces ? [0.2722287, 0.6740818, 0.0536895] : [0.2126, 0.7152, 0.0722];
+  const toAces = (rgb: number[]) => [
+    0.6130974 * rgb[0] + 0.3395231 * rgb[1] + 0.0473795 * rgb[2],
+    0.0701937 * rgb[0] + 0.9163539 * rgb[1] + 0.0134524 * rgb[2],
+    0.0206156 * rgb[0] + 0.1095698 * rgb[1] + 0.8698153 * rgb[2],
+  ];
+  const fromAces = (rgb: number[]) => [
+    1.7048587 * rgb[0] - 0.6217160 * rgb[1] - 0.0832994 * rgb[2],
+    -0.1300768 * rgb[0] + 1.1407358 * rgb[1] - 0.0105598 * rgb[2],
+    -0.0239641 * rgb[0] - 0.1289755 * rgb[1] + 1.1530140 * rgb[2],
+  ];
   const pixels = imageData.data;
 
   for (let offset = 0; offset < pixels.length; offset += 4) {
-    let r = srgbToLinear(pixels[offset] / 255) * gains[0];
-    let g = srgbToLinear(pixels[offset + 1] / 255) * gains[1];
-    let b = srgbToLinear(pixels[offset + 2] / 255) * gains[2];
-
-    r = pivot + (r - pivot) * contrast;
-    g = pivot + (g - pivot) * contrast;
-    b = pivot + (b - pivot) * contrast;
-
-    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    r = masterCurve(luma + (r - luma) * saturation, midpoint);
-    g = masterCurve(luma + (g - luma) * saturation, midpoint);
-    b = masterCurve(luma + (b - luma) * saturation, midpoint);
-
-    pixels[offset] = Math.round(clamp01(linearToSrgb(Math.max(0, r))) * 255);
-    pixels[offset + 1] = Math.round(clamp01(linearToSrgb(Math.max(0, g))) * 255);
-    pixels[offset + 2] = Math.round(clamp01(linearToSrgb(Math.max(0, b))) * 255);
+    let rgb = [
+      srgbToLinear(pixels[offset] / 255),
+      srgbToLinear(pixels[offset + 1] / 255),
+      srgbToLinear(pixels[offset + 2] / 255),
+    ];
+    if (aces) rgb = toAces(rgb);
+    rgb = rgb.map((value, index) => pivot + (value * gains[index] - pivot) * contrast);
+    const luma = rgb[0] * lumaCoefficients[0] + rgb[1] * lumaCoefficients[1] + rgb[2] * lumaCoefficients[2];
+    rgb = rgb.map(value => masterCurve(luma + (value - luma) * saturation, midpoint));
+    if (aces) rgb = fromAces(rgb);
+    pixels[offset] = Math.round(clamp01(linearToSrgb(Math.max(0, rgb[0]))) * 255);
+    pixels[offset + 1] = Math.round(clamp01(linearToSrgb(Math.max(0, rgb[1]))) * 255);
+    pixels[offset + 2] = Math.round(clamp01(linearToSrgb(Math.max(0, rgb[2]))) * 255);
   }
   return imageData;
 }
