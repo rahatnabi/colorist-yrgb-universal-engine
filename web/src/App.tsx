@@ -66,6 +66,10 @@ export default function App() {
   const [gamut, setGamut] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileNote, setProfileNote] = useState("");
+  const [lutFile, setLutFile] = useState<File | null>(null);
+  const [lutSize, setLutSize] = useState("35");
+  const [lutNote, setLutNote] = useState("");
+  const [lutBusy, setLutBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -237,6 +241,30 @@ export default function App() {
           <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source code-value range 0–1" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
+        <section className="card lut-export-card">
+          <div className="card-heading"><div><span className="section-kicker">LOOK DELIVERY</span><h2>3D LUT Export</h2></div><span className="subtle-tag">.CUBE · 3D GRID</span></div>
+          <p className="lut-export-description">Import a developed .cube look and resample it for delivery. The engine preserves the source LUT domain and evaluates its transform at the selected grid density.</p>
+          <div className="lut-export-controls">
+            <label className="lut-file-picker">SOURCE LOOK (.CUBE)<input type="file" accept=".cube,text/plain" onChange={e => { setLutFile(e.target.files?.[0] || null); setLutNote(""); }} /><span>{lutFile ? lutFile.name : "Choose a .cube look…"}</span></label>
+            <label>EXPORT GRID<select value={lutSize} onChange={e => setLutSize(e.target.value)}><option value="17">17 Point</option><option value="33">33 Point</option><option value="35">35 Point</option><option value="65">65 Point</option></select></label>
+            <button type="button" className="primary-button" disabled={!apiOnline || !lutFile || lutBusy} onClick={async () => {
+              if (!lutFile) return;
+              setLutBusy(true); setLutNote("Generating " + lutSize + "-point 3D LUT…");
+              try {
+                const body = new FormData(); body.append("file", lutFile);
+                const response = await fetch(API_BASE + "/v1/lut/export?size=" + lutSize + "&title=" + encodeURIComponent(lutFile.name.replace(/\\.cube$/i, "")), { method: "POST", body });
+                if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "LUT export failed"); }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a"); anchor.href = url; anchor.download = lutFile.name.replace(/\\.cube$/i, "") + "_" + lutSize + "pt.cube"; anchor.click(); URL.revokeObjectURL(url);
+                setLutNote("Export generated. Confirm the LUT input/output color-space contract before using it in another application.");
+              } catch (err) { setLutNote(err instanceof Error ? err.message : "LUT export failed"); }
+              finally { setLutBusy(false); }
+            }}>{lutBusy ? "Generating…" : "Export .cube LUT"}</button>
+          </div>
+          {lutNote && <div className="lut-export-note">{lutNote}</div>}
+          <div className="lut-grid-info"><span>35 POINT <b>42,875</b> RGB entries</span><span>65 POINT <b>274,625</b> RGB entries</span></div>
+        </section>
         <div className="bottom-disclaimer"><span>ENGINE NOTE</span> Browser preview is not a color-managed reference display. Histogram and parade show decoded source sample values only. No camera transform, IRE scale, luminance interpretation or calibrated vectorscope is inferred.</div>
       </section>
     </div>
