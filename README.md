@@ -25,6 +25,7 @@
 - Native scopes and Correction Accuracy API based on the same graded float32 still frame.
 - Full-resolution float32 TIFF and OpenEXR export path with no display-range clamping.
 - Preview/export metadata including working-space identity, transform identity, image dimensions and a float-sample SHA-256 digest.
+- Post-export round-trip verification and optional Correction Accuracy delivery QC measured from the decoded TIFF/OpenEXR master using an explicit neutral ROI.
 - Separate LUT import workflow; LUT files are not treated as image inputs.
 
 These features are an active foundation, not a claim that every camera transform or format is production-certified. Camera profiles remain blocked until their exact capture mode and transform are independently validated with traceable measured reference data. In particular, the Sony FX30 S-Log3/S-Gamut3.Cine candidate remains unverified.
