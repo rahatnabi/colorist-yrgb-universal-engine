@@ -125,3 +125,16 @@ The media probe exposes a `capture_metadata` object sourced only from ffprobe/co
 For each of FX3, FX6, and FX9, create a separate manifest with the exact model identifier reported by the camera, recording mode, codec/profile, bit depth, firmware, and actual gamut used (S-Gamut3.Cine versus S-Gamut3). Do not assume all three cameras or recording modes share those settings. If container metadata omits recording mode or firmware, capture those values from the camera's recording setup/report and preserve that provenance alongside the reference set.
 
 The current manifest validator requires one exact camera model, recording mode, codec, and bit depth. It validates the selected OCIO transform against supplied measured vectors; it does not itself establish whether camera metadata is genuine or whether reference measurements are traceable. The three camera-specific reference sets therefore remain pending until independently measured values and provenance are supplied.
+
+
+## Sony FX3 / FX6 / FX9 camera-specific capture sets
+
+Separate reference-manifest templates are provided for each target camera:
+
+- `data/reference_vectors/sony_fx3_slog3_sgamut3cine.template.json` — Sony ILME-FX3
+- `data/reference_vectors/sony_fx6_slog3_sgamut3cine.template.json` — Sony ILME-FX6
+- `data/reference_vectors/sony_fx9_slog3_sgamut3cine.template.json` — Sony ILME-FX9
+
+All three currently target the same candidate S-Log3 / S-Gamut3.Cine OCIO mapping, but have distinct reference-set IDs. This is intentional: a passing result for one camera is not evidence for the other two. The templates do not prescribe a recording mode, codec, bit depth, or firmware. Fill those fields from the actual camera and clip metadata, and verify that the selected gamut is S-Gamut3.Cine rather than S-Gamut3 before collecting vectors.
+
+The templates contain no measured vectors and cannot pass validation. If the recording uses S-Gamut3, stop and use the separate `sony.slog3.sgamut3` registry candidate; do not relabel it as S-Gamut3.Cine. Record exact acquisition settings and independent reference provenance for every camera-specific set.
