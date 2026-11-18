@@ -53,9 +53,14 @@ These are candidate dependencies, not a claim that every codec or camera format 
 - OpenColorIO transform adapter and .cube parsing/application reference implementation.
 - Frame histograms, RGB Parade, optional waveform/vectorscope data, and JSON-ready scope snapshots.
 - Exposure, spatial exposure, temporal exposure, color matching, and operator-selected ROI chroma diagnostics.
+- Initial FastAPI service boundary for health, capability discovery, camera-profile candidate lookup, and bounded media probing.
 - Automated tests and CI checks for the implemented numerical contracts.
 
 These are engine foundations, not a claim that every decoder, camera transform, scope visualization, or real-time workflow is production-ready. Camera profile entries remain unverified until reference transforms and known-value tests are completed.
+
+## HTTP API
+
+Install with `python -m pip install -e ".[dev,api]"` and run `uvicorn yrgb_engine.api:app --reload`. The initial API provides `/health`, `/v1/capabilities`, `/v1/profiles`, `/v1/profiles/candidates`, and `/v1/media/probe`. See [HTTP API](docs/http-api.md) for limits and deployment caveats. The browser grading interface is still planned, not implemented.
 
 ## Development
 
