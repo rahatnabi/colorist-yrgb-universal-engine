@@ -390,3 +390,21 @@ def test_video_transform_preview_blocks_unverified_profile_before_decode():
     )
     assert response.status_code == 409
     assert "not reference-validated" in response.json()["detail"]
+
+
+def test_ocio_status_reports_missing_server_config(monkeypatch):
+    monkeypatch.delenv("YRGB_OCIO_CONFIG", raising=False)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.get("/v1/ocio/status")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configured"] is False
+    assert payload["status"] == "not_configured"
+
+
+def test_ocio_status_reports_missing_config_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(tmp_path / "missing.ocio"))
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.get("/v1/ocio/status")
+    assert response.status_code == 200
+    assert response.json()["status"] == "config_file_missing"
