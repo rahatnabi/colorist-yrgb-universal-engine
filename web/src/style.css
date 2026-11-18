@@ -190,3 +190,20 @@
 .accuracy-report-note{font-size:8px;line-height:1.5;color:#798374}
 @media(max-width:900px){.accuracy-report-grid{grid-template-columns:1fr}.accuracy-report-section{padding:11px}.accuracy-report-footer{flex-direction:column}.accuracy-live-controls{max-width:none;justify-content:flex-start}.accuracy-live-controls>span{text-align:left}}
 @media(max-width:520px){.accuracy-report-heading{align-items:flex-start}.accuracy-overall-score>strong{font-size:21px}.accuracy-section-title>b{font-size:7px}}
+
+.camera-metadata-panel{margin-top:12px;padding:13px;border:1px solid #343b31;border-radius:5px;background:#151a15}
+.camera-metadata-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.camera-metadata-heading>b{font-size:9px;letter-spacing:1px;color:#d5bd8b}
+.camera-metadata-heading>span{font-size:8px;color:#84917e;letter-spacing:.6px}
+.camera-metadata-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.camera-metadata-grid>div{min-width:0;padding:8px;border:1px solid #30372d;border-radius:3px;background:#1b211a}
+.camera-metadata-grid small{display:block;margin-bottom:4px;color:#82907b;font-size:8px;text-transform:uppercase;letter-spacing:.5px}
+.camera-metadata-grid b{display:block;overflow-wrap:anywhere;color:#d4d9cc;font-size:10px;font-weight:550}
+.camera-metadata-panel>p{margin:8px 0;color:#9ca794;font-size:10px;line-height:1.55}
+.camera-metadata-tools{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.camera-metadata-tools>span{flex:1;min-width:180px;color:#84907d;font-size:8px;line-height:1.5}
+.camera-metadata-panel details{margin-top:10px;border-top:1px solid #30372d;padding-top:9px}
+.camera-metadata-panel summary{cursor:pointer;color:#aab69f;font-size:9px}
+.camera-metadata-panel pre{max-height:220px;overflow:auto;padding:9px;background:#101410;color:#a9b79f;font-size:8px;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:900px){.camera-metadata-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.camera-metadata-grid{grid-template-columns:1fr}}
