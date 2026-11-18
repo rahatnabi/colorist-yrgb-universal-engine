@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";
+import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, GraduationCap, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";
 import InteractiveGradingPreview from "./InteractiveGradingPreview";
 import TransformValidationPanel from "./TransformValidationPanel";
+import GuidedLearningSchool from "./GuidedLearningSchool";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
@@ -83,6 +84,7 @@ function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vect
 
 export default function App() {
   const [apiOnline, setApiOnline] = useState(false);
+  const [activeView, setActiveView] = useState<"analysis" | "learning">("analysis");
   const [ocioStatus, setOcioStatus] = useState<OcioStatus | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [batchFiles, setBatchFiles] = useState<File[]>([]);
@@ -269,7 +271,8 @@ export default function App() {
     <div className="workspace">
       <aside className="sidebar">
         <div className="side-label">WORKSPACE</div>
-        <div className="nav-item active"><FileImage size={17} /> Image Analysis</div>
+        <button type="button" className={"nav-item nav-button" + (activeView === "analysis" ? " active" : "")} onClick={() => setActiveView("analysis")}><FileImage size={17} /> Image Analysis</button>
+        <button type="button" className={"nav-item nav-button" + (activeView === "learning" ? " active" : "")} onClick={() => setActiveView("learning")}><GraduationCap size={17} /> Learning School</button>
         <div className="nav-item disabled"><Clapperboard size={17} /> Color Grading <small>SOON</small></div>
         <div className="nav-item disabled"><Gauge size={17} /> Shot Matching <small>SOON</small></div>
         <div className="side-divider" />
@@ -281,6 +284,7 @@ export default function App() {
       </aside>
 
       <section className="main-content">
+        {activeView === "learning" ? <GuidedLearningSchool apiBase={API_BASE} /> : <>
         <div className="page-heading"><div><div className="eyebrow">STILL IMAGE WORKFLOW / 01</div><h1>Still Image Intelligence</h1><p>Inspect, analyze, grade and prepare still images for delivery.</p></div><div className="pipeline-pill"><span>INPUT</span><b>→</b><span className="current">ANALYSIS</span><b>→</b><span>GRADE</span><b>→</b><span>OUTPUT</span></div></div>
 
         <div className="content-grid">
@@ -701,6 +705,7 @@ export default function App() {
           <div className="lut-grid-info"><span>35 POINT <b>42,875</b> RGB entries</span><span>65 POINT <b>274,625</b> RGB entries</span></div>
         </section>
         <div className="bottom-disclaimer"><span>ENGINE NOTE</span> Browser preview is not a color-managed reference display. Histogram and parade show decoded source sample values only. No camera transform, IRE scale, luminance interpretation or calibrated vectorscope is inferred.</div>
+        </>}
       </section>
     </div>
   </main>;
