@@ -69,6 +69,9 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             "X-YRGB-Roundtrip-RMSE",
             "X-YRGB-Roundtrip-Sample-Count",
             "X-YRGB-Roundtrip-SHA256-Matches",
+            "X-YRGB-Delivery-QC-Status",
+            "X-YRGB-Correction-Accuracy-Score",
+            "X-YRGB-Delivery-QC-Report",
         ],
     )
 
@@ -1425,11 +1428,20 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         temperature_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
         tint_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
         curve_midpoint: float = Form(default=0.5, ge=0.1, le=0.9),
+        roi_x: int | None = Form(default=None, ge=0),
+        roi_y: int | None = Form(default=None, ge=0),
+        roi_width: int | None = Form(default=None, ge=1),
+        roi_height: int | None = Form(default=None, ge=1),
+        exposure_target_stops: float = Form(default=0.0, ge=-8.0, le=8.0),
+        gray_reference: float = Form(default=0.18, gt=0.0, le=4.0),
     ) -> FileResponse:
-        """Export the full-resolution validated scene-linear graded still as float32 TIFF/EXR."""
+        """Export a validated float master and optionally assess its verified round-trip ROI."""
         from dataclasses import replace
         from .grading_pipeline import GradingPipelineError, process_validated_still
         from .look import LookSettings
+        from .accuracy import AccuracyTarget, measure_correction_accuracy
+        from .correction_report import build_correction_accuracy_report
+        from .exposure import PixelRegion
         from .native_export import (
             NativeExportError, native_frame_sha256, save_native_float_image,
             verify_native_float_export,
@@ -1439,6 +1451,9 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         normalized_format = export_format.casefold().lstrip(".")
         if normalized_format not in {"exr", "tif", "tiff"}:
             raise HTTPException(status_code=422, detail="Choose EXR or TIFF float32 export.")
+        roi_values = (roi_x, roi_y, roi_width, roi_height)
+        if any(value is not None for value in roi_values) and not all(value is not None for value in roi_values):
+            raise HTTPException(status_code=422, detail="Delivery QC ROI requires x, y, width and height together.")
         extension = ".exr" if normalized_format == "exr" else ".tiff"
         media_type = "image/x-exr" if normalized_format == "exr" else "image/tiff"
         profile = profile_registry.get_by_id(profile_id)
@@ -1520,26 +1535,55 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 roundtrip = await run_in_threadpool(verify_native_float_export, graded, export_path)
             except NativeExportError as exc:
                 raise HTTPException(status_code=422, detail=f"Native export round-trip verification failed: {exc}") from exc
+            delivery_report = None
+            if all(value is not None for value in roi_values):
+                assert roi_x is not None and roi_y is not None and roi_width is not None and roi_height is not None
+                if roi_x + roi_width > graded.width or roi_y + roi_height > graded.height:
+                    raise HTTPException(status_code=422, detail="Delivery QC ROI must be fully inside the exported still.")
+                if roi_width * roi_height < 16:
+                    raise HTTPException(status_code=422, detail="Delivery QC ROI must contain at least 16 pixels.")
+                target = AccuracyTarget(
+                    exposure_stops=exposure_target_stops,
+                    gray_reference=gray_reference,
+                    luminance_coefficients=coefficients,
+                )
+                region = PixelRegion(roi_x, roi_y, roi_width, roi_height)
+                try:
+                    accuracy = await run_in_threadpool(measure_correction_accuracy, graded, region, target)
+                    delivery_report = build_correction_accuracy_report(accuracy, target)
+                except ValueError as exc:
+                    raise HTTPException(status_code=422, detail=f"Delivery QC measurement failed: {exc}") from exc
+            response_headers = {
+                "X-YRGB-Export-Scope": "full-resolution",
+                "X-YRGB-Sample-Format": "float32",
+                "X-YRGB-Sample-Domain": "validated-scene-linear",
+                "X-YRGB-Working-Space": working_space,
+                "X-YRGB-Transform-ID": str(graded.encoding.transform_id or ""),
+                "X-YRGB-Frame-Width": str(graded.width),
+                "X-YRGB-Frame-Height": str(graded.height),
+                "X-YRGB-Float-Samples-SHA256": digest,
+                "X-YRGB-Clamped": "false",
+                "X-YRGB-Roundtrip-Verified": str(bool(roundtrip["verified"])).lower(),
+                "X-YRGB-Roundtrip-Max-Absolute-Error": str(roundtrip["max_absolute_error"]),
+                "X-YRGB-Roundtrip-RMSE": str(roundtrip["rmse"]),
+                "X-YRGB-Roundtrip-Sample-Count": str(roundtrip["sample_count"]),
+                "X-YRGB-Roundtrip-SHA256-Matches": str(bool(roundtrip["sample_sha256_matches"])).lower(),
+                "X-YRGB-Delivery-QC-Status": "not_requested",
+            }
+            if delivery_report is not None:
+                report_payload = asdict(delivery_report)
+                response_headers["X-YRGB-Delivery-QC-Status"] = delivery_report.status
+                response_headers["X-YRGB-Correction-Accuracy-Score"] = (
+                    "" if delivery_report.score is None else str(delivery_report.score)
+                )
+                response_headers["X-YRGB-Delivery-QC-Report"] = __import__("base64").urlsafe_b64encode(
+                    json.dumps(report_payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
+                ).decode("ascii")
             response = FileResponse(
                 export_path,
                 media_type=media_type,
                 filename=f"{Path(filename).stem}_YRGB_master{extension}",
-                headers={
-                    "X-YRGB-Export-Scope": "full-resolution",
-                    "X-YRGB-Sample-Format": "float32",
-                    "X-YRGB-Sample-Domain": "validated-scene-linear",
-                    "X-YRGB-Working-Space": working_space,
-                    "X-YRGB-Transform-ID": str(graded.encoding.transform_id or ""),
-                    "X-YRGB-Frame-Width": str(graded.width),
-                    "X-YRGB-Frame-Height": str(graded.height),
-                    "X-YRGB-Float-Samples-SHA256": digest,
-                    "X-YRGB-Clamped": "false",
-                    "X-YRGB-Roundtrip-Verified": str(bool(roundtrip["verified"])).lower(),
-                    "X-YRGB-Roundtrip-Max-Absolute-Error": str(roundtrip["max_absolute_error"]),
-                    "X-YRGB-Roundtrip-RMSE": str(roundtrip["rmse"]),
-                    "X-YRGB-Roundtrip-Sample-Count": str(roundtrip["sample_count"]),
-                    "X-YRGB-Roundtrip-SHA256-Matches": str(bool(roundtrip["sample_sha256_matches"])).lower(),
-                },
+                headers=response_headers,
                 background=BackgroundTask(lambda cleanup_path=export_path: Path(cleanup_path).unlink(missing_ok=True)),
             )
             export_path = None
