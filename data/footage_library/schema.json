@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coloristyrgb.example/schemas/footage-asset.schema.json",
+  "title": "COLORIST YRGB Footage Asset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id", "asset_kind", "asset_state", "provenance", "files", "profile_claim"],
+  "properties": {
+    "asset_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$"},
+    "asset_kind": {"enum": ["camera_original", "training_media", "decoder_fixture", "color_reference", "synthetic"]},
+    "asset_state": {"enum": ["registered", "bytes_acquired", "probed", "decoded", "metadata_reviewed", "training_cleared", "reference_qualified"]},
+    "provenance": {
+      "type": "object",
+      "required": ["source_type", "source_reference", "rights_status"],
+      "properties": {
+        "source_type": {"enum": ["user_supplied", "official_vendor", "open_source_repository", "licensed_library", "generated"]},
+        "source_reference": {"type": "string"},
+        "revision_or_capture_date": {"type": ["string", "null"]},
+        "license_or_permission": {"type": ["string", "null"]},
+        "rights_status": {"enum": ["unknown", "permission_pending", "private_use_only", "training_use_cleared", "redistribution_cleared"]},
+        "attribution": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["role", "filename", "acquisition_state"],
+        "properties": {
+          "role": {"enum": ["video_original", "image_original", "raw_original", "sidecar", "proxy", "frame_still", "reference_data", "report"]},
+          "filename": {"type": "string"},
+          "acquisition_state": {"enum": ["pending", "acquired", "verified"]},
+          "byte_size": {"type": ["integer", "null"], "minimum": 0},
+          "sha256": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+          "storage_uri": {"type": ["string", "null"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "profile_claim": {
+      "type": "object",
+      "required": ["transfer_function", "gamut", "claim_source", "verification_state"],
+      "properties": {
+        "transfer_function": {"type": ["string", "null"]},
+        "gamut": {"type": ["string", "null"]},
+        "claim_source": {"enum": ["user_asserted", "container_metadata", "camera_sidecar", "vendor_documentation", "measured_reference"]},
+        "verification_state": {"enum": ["unverified", "metadata_confirmed", "reference_validated"]}
+      },
+      "additionalProperties": false
+    },
+    "capture_metadata": {
+      "type": "object",
+      "properties": {
+        "camera_make": {"type": ["string", "null"]},
+        "camera_model": {"type": ["string", "null"]},
+        "recording_mode": {"type": ["string", "null"]},
+        "firmware": {"type": ["string", "null"]},
+        "codec": {"type": ["string", "null"]},
+        "codec_profile": {"type": ["string", "null"]},
+        "pixel_format": {"type": ["string", "null"]},
+        "bit_depth": {"type": ["integer", "null"], "minimum": 1},
+        "chroma_subsampling": {"type": ["string", "null"]},
+        "width": {"type": ["integer", "null"], "minimum": 1},
+        "height": {"type": ["integer", "null"], "minimum": 1},
+        "frame_rate": {"type": ["string", "null"]},
+        "range": {"type": ["string", "null"]},
+        "transfer": {"type": ["string", "null"]},
+        "primaries": {"type": ["string", "null"]},
+        "matrix": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "decoder_report": {"type": ["string", "null"]},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}
