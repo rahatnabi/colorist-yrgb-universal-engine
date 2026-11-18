@@ -252,11 +252,11 @@ export default function App() {
               setLutBusy(true); setLutNote("Generating " + lutSize + "-point 3D LUT…");
               try {
                 const body = new FormData(); body.append("file", lutFile);
-                const response = await fetch(API_BASE + "/v1/lut/export?size=" + lutSize + "&title=" + encodeURIComponent(lutFile.name.replace(/\\.cube$/i, "")), { method: "POST", body });
+                const response = await fetch(API_BASE + "/v1/lut/export?size=" + lutSize + "&title=" + encodeURIComponent(lutFile.name.replace(/\.cube$/i, "")), { method: "POST", body });
                 if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "LUT export failed"); }
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
-                const anchor = document.createElement("a"); anchor.href = url; anchor.download = lutFile.name.replace(/\\.cube$/i, "") + "_" + lutSize + "pt.cube"; anchor.click(); URL.revokeObjectURL(url);
+                const anchor = document.createElement("a"); anchor.href = url; anchor.download = lutFile.name.replace(/\.cube$/i, "") + "_" + lutSize + "pt.cube"; anchor.click(); URL.revokeObjectURL(url);
                 setLutNote("Export generated. Confirm the LUT input/output color-space contract before using it in another application.");
               } catch (err) { setLutNote(err instanceof Error ? err.message : "LUT export failed"); }
               finally { setLutBusy(false); }
