@@ -13,11 +13,12 @@ authors = [{ name = "COLORIST YRGB" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.6"]
+dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27"]
 images = ["Pillow>=10.0"]
 high-precision = ["OpenImageIO>=2.4", "numpy>=1.26"]
 raw = ["rawpy>=0.19", "numpy>=1.26"]
 ocio = ["opencolorio>=2.3"]
+api = ["fastapi>=0.115", "python-multipart>=0.0.9", "uvicorn>=0.30"]
 
 [project.scripts]
 yrgb-probe = "yrgb_engine.cli:main"
