@@ -50,3 +50,16 @@ When a suitable source is found, the resource record must include:
 ## Source inventory
 
 See `data/reference_sources/github_resources.json` for the machine-readable inventory. All resource imports must retain their original attribution and license obligations. Upstream implementation, sample media, and measured reference data are three different evidence classes and must remain separate.
+
+## OpenEXR decoder conformance fixtures
+
+The OpenEXR project's BSD-3-Clause repository contains paired scanline files for increasing and decreasing line order. Both fixtures are pinned to immutable commit 49a84f33e675ad4457c8487293eee35622a0c9fd and recorded in the resource manifest.
+
+Fetch either fixture with Git-object checksum verification:
+
+```bash
+python scripts/fetch_openexr_fixture.py --fixture line-order-increasing --output .cache/fixtures/lineOrder_increasing.exr
+python scripts/fetch_openexr_fixture.py --fixture line-order-decreasing --output .cache/fixtures/lineOrder_decreasing.exr
+```
+
+The downloader checks the exact byte count and Git blob SHA-1 before writing. These are container/decoder conformance fixtures, not camera footage, scene-linear ground truth, or color-transform reference vectors. The files are not copied into the repository; fetching is an explicit local action.
