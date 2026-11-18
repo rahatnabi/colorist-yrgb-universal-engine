@@ -985,8 +985,8 @@ def test_native_measurements_uses_same_validated_graded_frame_for_scopes_and_acc
         encoding=ColorEncoding(),
     )
     graded = PrecisionFrame.from_interleaved(
-        width=2, height=2, channel_names=("R", "G", "B"),
-        values=(0.18, 0.18, 0.18) * 4, source_path="fixture", decoder="test",
+        width=4, height=4, channel_names=("R", "G", "B"),
+        values=(0.18, 0.18, 0.18) * 16, source_path="fixture", decoder="test",
         encoding=ColorEncoding(
             primaries="DaVinci Wide Gamut", transfer="Linear",
             profile_id=profile_id, validated=True,
