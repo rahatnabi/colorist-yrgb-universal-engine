@@ -74,6 +74,32 @@
       "license": "Apache-2.0",
       "use": "Core ACES CTL functions and color-science implementation reference.",
       "validation_scope": "Algorithm/source reference; not camera-specific reference captures."
+    },
+    {
+      "id": "openexr-line-order-increasing",
+      "kind": "image-decoder-conformance-fixture",
+      "repository": "AcademySoftwareFoundation/openexr",
+      "revision": "49a84f33e675ad4457c8487293eee35622a0c9fd",
+      "path": "src/test/OpenEXRTest/lineOrder_increasing.exr",
+      "url": "https://raw.githubusercontent.com/AcademySoftwareFoundation/openexr/49a84f33e675ad4457c8487293eee35622a0c9fd/src/test/OpenEXRTest/lineOrder_increasing.exr",
+      "git_blob_sha1": "6d7ed0c0fdfefae6e4b73ccd1c3e5cc9f6321b50",
+      "size_bytes": 144543,
+      "license": "BSD-3-Clause (upstream repository LICENSE.md)",
+      "use": "Pinned OpenEXR decoder conformance fixture for increasing scanline line order.",
+      "validation_scope": "EXR container and decoder behavior only; not colorimetry or camera-reference validation."
+    },
+    {
+      "id": "openexr-line-order-decreasing",
+      "kind": "image-decoder-conformance-fixture",
+      "repository": "AcademySoftwareFoundation/openexr",
+      "revision": "49a84f33e675ad4457c8487293eee35622a0c9fd",
+      "path": "src/test/OpenEXRTest/lineOrder_decreasing.exr",
+      "url": "https://raw.githubusercontent.com/AcademySoftwareFoundation/openexr/49a84f33e675ad4457c8487293eee35622a0c9fd/src/test/OpenEXRTest/lineOrder_decreasing.exr",
+      "git_blob_sha1": "cc95ecc73abb5d186a4b7e0958a97c854fe624f4",
+      "size_bytes": 144543,
+      "license": "BSD-3-Clause (upstream repository LICENSE.md)",
+      "use": "Pinned OpenEXR decoder conformance fixture for decreasing scanline line order.",
+      "validation_scope": "EXR container and decoder behavior only; not colorimetry or camera-reference validation."
     }
   ]
 }
