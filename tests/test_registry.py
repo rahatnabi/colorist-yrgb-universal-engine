@@ -363,6 +363,20 @@ def test_profile_mapping_without_independent_reference_evidence_is_blocked():
     assert profile["usable_for_transform"] is False
 
 
+
+def test_fx30_xml_identified_slog3_cine_profile_resolves_exactly():
+    registry = ProfileRegistry.load()
+    profile = registry.resolve(
+        manufacturer="Sony",
+        encoding="S-Log3",
+        gamut="S-Gamut3.Cine",
+        camera_model="ILME-FX30",
+    )
+    assert profile is not None
+    assert profile["id"] == "sony.slog3.sgamut3cine"
+    assert profile["usable_for_transform"] is False
+
+
 def test_dji_dlog_candidate_uses_exact_aces_studio_space_name():
     profile = ProfileRegistry.load().get_by_id("dji.dlog")
     assert profile["ocio_source_space"] == "D-Log D-Gamut"
