@@ -146,6 +146,8 @@ def apply_reference_validated_transform(
         raise TransformValidationError("Requested spaces do not match the validated transform record.")
     if not output_transfer.strip():
         raise TransformValidationError("An explicit destination transfer function is required.")
+    if frame.encoding.profile_id != source_space:
+        raise TransformValidationError("Frame profile ID must exactly match the validated source space.")
     path = Path(config_path)
     if not path.is_file() or sha256(path.read_bytes()).hexdigest() != result.config_sha256:
         raise TransformValidationError("OCIO config hash differs from the validated config.")
