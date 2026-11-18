@@ -153,16 +153,21 @@ def apply_reference_validated_transform(
     destination_space: str,
     config_path: str | Path,
     output_transfer: str,
+    profile_id: str,
 ) -> PrecisionFrame:
     """Apply only the exact config/transform pair that passed reference vectors."""
     if not result.passed:
         raise TransformValidationError("Reference vectors did not pass; transform remains unverified.")
     if (source_space, destination_space) != (result.source_space, result.destination_space):
         raise TransformValidationError("Requested spaces do not match the validated transform record.")
+    if not result.transform_id.strip() or not result.reference_set_id.strip():
+        raise TransformValidationError("A complete transform and reference-set identity is required.")
     if not output_transfer.strip():
         raise TransformValidationError("An explicit destination transfer function is required.")
-    if frame.encoding.profile_id != source_space:
-        raise TransformValidationError("Frame profile ID must exactly match the validated source space.")
+    if not profile_id.strip():
+        raise TransformValidationError("An exact camera registry profile ID is required.")
+    if frame.encoding.profile_id != profile_id:
+        raise TransformValidationError("Frame camera profile ID does not match the selected registry profile.")
     path = Path(config_path)
     if not path.is_file() or sha256(path.read_bytes()).hexdigest() != result.config_sha256:
         raise TransformValidationError("OCIO config hash differs from the validated config.")
