@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "profile_id": "sony.slog3.sgamut3cine",
+  "transform_id": "aces-v4.0.0.sony.slog3.sgamut3cine.to-davinci-intermediate-widegamut",
+  "source_space": "S-Log3 S-Gamut3.Cine",
+  "destination_space": "DaVinci Intermediate WideGamut",
+  "reference_source": "REQUIRED: cite independent reference source",
+  "measurement_method": "REQUIRED: document chart, patch extraction and measurement method",
+  "notes": "Camera-specific template only. Replace every REQUIRED field and add independently measured vectors. Do not use synthetic or guessed values. The camera model label does not imply a particular recording mode, codec, bit depth or firmware.",
+  "vectors": [],
+  "recording_mode": "REQUIRED: exact camera recording mode",
+  "codec": "REQUIRED: exact codec and profile",
+  "bit_depth": null,
+  "firmware_version": "REQUIRED: exact firmware version or documented unavailable",
+  "camera_model": "ILME-FX3",
+  "reference_set_id": "sony-fx3-slog3-sgamut3cine-reference-v1"
+}
