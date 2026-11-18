@@ -169,3 +169,61 @@ def test_registry_pipeline_requires_frame_profile_identity(tmp_path):
         prepare_frame_for_working_space(
             _frame(None), registry=registry, config_path=tmp_path / "missing.ocio"
         )
+
+
+def test_registry_driven_prepare_applies_only_complete_approved_profile(tmp_path, monkeypatch):
+    config = tmp_path / "config.ocio"
+    config.write_text("pinned-config")
+    validation = _validate(config).to_registry_record()
+    profile = {
+        "id": "test.camera.profile",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "camera_models": [],
+        "status": "verified",
+        "transform_id": "test.camera.to.working",
+        "ocio_source_space": "OCIO Camera Log",
+        "ocio_destination_space": "DaVinci Wide Gamut",
+        "output_transfer": "DaVinci Intermediate",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": validation,
+    }
+    registry = ProfileRegistry([profile])
+    monkeypatch.setattr(
+        "yrgb_engine.transform_validation.transform_frame",
+        lambda source, **_kwargs: source,
+    )
+    prepared = prepare_frame_for_working_space(
+        _frame(), registry=registry, config_path=config
+    )
+    assert prepared.encoding.validated is True
+    assert prepared.encoding.working_space_id == "DaVinci Wide Gamut"
+    assert prepared.encoding.transfer == "DaVinci Intermediate"
+
+
+def test_registry_driven_prepare_rejects_profile_evidence_from_other_config(tmp_path):
+    config = tmp_path / "config.ocio"
+    config.write_text("current-config")
+    other_config = tmp_path / "other.ocio"
+    other_config.write_text("different-config")
+    validation = _validate(other_config).to_registry_record()
+    profile = {
+        "id": "test.camera.profile",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "camera_models": [],
+        "status": "verified",
+        "transform_id": "test.camera.to.working",
+        "ocio_source_space": "OCIO Camera Log",
+        "ocio_destination_space": "DaVinci Wide Gamut",
+        "output_transfer": "DaVinci Intermediate",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": validation,
+    }
+    registry = ProfileRegistry([profile])
+    with pytest.raises(TransformValidationError, match="hash"):
+        prepare_frame_for_working_space(
+            _frame(), registry=registry, config_path=config
+        )
