@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, MonitorPlay, ScanSearch, Settings2, UploadCloud } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
@@ -11,9 +11,10 @@ type Profile = { id: string; manufacturer: string; encoding: string; gamut?: str
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
 type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
-type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }> };
+type RoiMeasurement = { roi: { x: number; y: number; width: number; height: number; coordinate_space: string }; pixel_bounds: { left: number; top: number; right: number; bottom: number }; pixel_count: number; measurement_domain: string; channels: Record<string, { mean: number }> };
+type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
-type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
+type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -63,6 +64,10 @@ export default function App() {
   const [sampleInterval, setSampleInterval] = useState("1");
   const [sampleCount, setSampleCount] = useState("8");
   const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
+  const [roiSelecting, setRoiSelecting] = useState(false);
+  const [roiRect, setRoiRect] = useState({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
+  const [previewAspect, setPreviewAspect] = useState("16 / 9");
+  const roiDragStart = useRef<{ x: number; y: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
@@ -214,7 +219,31 @@ export default function App() {
             </label>
             {error && <div className="error-message">{error}</div>}
             {file && <div className="media-result">
-              <div className="media-preview">{previewUrl && isVideo ? <video src={previewUrl} controls /> : previewUrl && isImage ? <img src={previewUrl} alt="Local media preview" /> : <div className="unsupported-preview"><FileImage size={26} /><span>Browser preview unavailable</span></div>}</div>
+              <div className={"media-preview" + (roiSelecting ? " roi-preview" : "")} style={isVideo ? { aspectRatio: previewAspect } : undefined}>
+                {previewUrl && isVideo ? <video src={previewUrl} controls={!roiSelecting} onLoadedMetadata={event => setPreviewAspect(event.currentTarget.videoWidth + " / " + event.currentTarget.videoHeight)} /> : previewUrl && isImage ? <img src={previewUrl} alt="Local media preview" /> : <div className="unsupported-preview"><FileImage size={26} /><span>Browser preview unavailable</span></div>}
+                {isVideo && roiSelecting && <div className="roi-selection-layer"
+                  onPointerDown={event => {
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    const point = { x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)), y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)) };
+                    roiDragStart.current = point;
+                    setRoiRect({ x: point.x, y: point.y, width: Math.min(0.02, 1 - point.x), height: Math.min(0.02, 1 - point.y) });
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={event => {
+                    if (!roiDragStart.current) return;
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    const px = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+                    const py = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+                    const sx = roiDragStart.current.x, sy = roiDragStart.current.y;
+                    const x = Math.min(sx, px), y = Math.min(sy, py);
+                    setRoiRect({ x, y, width: Math.min(1 - x, Math.max(0.02, Math.abs(px - sx))), height: Math.min(1 - y, Math.max(0.02, Math.abs(py - sy))) });
+                  }}
+                  onPointerUp={() => { roiDragStart.current = null; }}
+                  onPointerCancel={() => { roiDragStart.current = null; }}>
+                  <div className="roi-selection-box" style={{ left: (roiRect.x * 100) + "%", top: (roiRect.y * 100) + "%", width: (roiRect.width * 100) + "%", height: (roiRect.height * 100) + "%" }} />
+                  <span>DRAG TO SELECT ROI</span>
+                </div>}
+              </div>
               <div className="media-meta"><div className="file-title">{isVideo ? <Film size={15} /> : <FileImage size={15} />}<b>{file.name}</b></div><span>{formatBytes(file.size)} · {file.type || "Unknown MIME type"}</span>
                 {busy ? <span className="processing"><LoaderCircle size={14} /> Inspecting media metadata…</span> : probe ? <span className="success-line"><CheckCircle2 size={14} /> Probe complete · {probe.probe.status || "unknown"}</span> : null}
               </div>
@@ -256,6 +285,15 @@ export default function App() {
                   finally { setBusy(false); }
                 }}>Analyze frame</button>
               </div>}
+              {isVideo && <div className="roi-control">
+                <div className="sample-control-heading"><b>Fixed Region of Interest</b><span>FRAME-LOCKED · NORMALIZED COORDINATES</span></div>
+                <div className="roi-control-row">
+                  <button type="button" className={roiSelecting ? "roi-select-button active" : "roi-select-button"} onClick={() => setRoiSelecting(value => !value)}>{roiSelecting ? "Finish ROI selection" : "Draw ROI on preview"}</button>
+                  <button type="button" className="roi-reset-button" onClick={() => setRoiRect({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 })}>Reset center</button>
+                  <span>X {roiRect.x.toFixed(3)} · Y {roiRect.y.toFixed(3)} · W {roiRect.width.toFixed(3)} · H {roiRect.height.toFixed(3)}</span>
+                </div>
+                <p>Drag across the video preview to draw a new rectangle. Re-draw to reposition or resize it. The same image-coordinate region is measured in every sampled frame.</p>
+              </div>}
               {isVideo && <div className="video-sample-control">
                 <div className="sample-control-heading"><b>Temporal Sample Analysis</b><span>BOUNDED FRAME SCAN</span></div>
                 <div className="sample-control-fields">
@@ -266,7 +304,7 @@ export default function App() {
                     setBusy(true); setSampleReport(null); setAnalysisNote("Sampling video frames and comparing adjacent histograms…");
                     try {
                       const body = new FormData(); body.append("file", file);
-                      const params = new URLSearchParams({ start_seconds: frameTimestamp, interval_seconds: sampleInterval, frame_count: sampleCount, shot_change_threshold: "0.35" });
+                      const params = new URLSearchParams({ start_seconds: frameTimestamp, interval_seconds: sampleInterval, frame_count: sampleCount, shot_change_threshold: "0.35", roi_x: String(roiRect.x), roi_y: String(roiRect.y), roi_width: String(roiRect.width), roi_height: String(roiRect.height) });
                       const response = await fetch(API_BASE + "/v1/media/video-sample?" + params.toString(), { method: "POST", body });
                       const data = await response.json();
                       if (!response.ok) throw new Error(data.detail || "Video sample analysis failed");
@@ -302,7 +340,23 @@ export default function App() {
                     </svg>
                     <div className="temporal-trend-legend"><span>R · {sampleReport.frames[0]?.channels.R.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.R.mean.toFixed(4) ?? "—"}</span><span>G · {sampleReport.frames[0]?.channels.G.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.G.mean.toFixed(4) ?? "—"}</span><span>B · {sampleReport.frames[0]?.channels.B.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.B.mean.toFixed(4) ?? "—"}</span></div>
                   </div>
-                  <div className="consistency-unavailable"><b>Consistency diagnostics</b><span>Exposure drift: requires validated linear RGB + selected ROI</span><span>Neutral region: requires validated linear RGB</span><span>Mixed-camera match: requires common validated working space</span></div>
+                  <div className="temporal-trend-panel roi-trend-panel">
+                    <div className="sample-control-heading"><b>Selected ROI · RGB Temporal Trend</b><span>DECODER SAMPLE DOMAIN · NOT LINEAR LIGHT</span></div>
+                    <svg viewBox="0 0 600 150" role="img" aria-label="Selected region RGB temporal trend" preserveAspectRatio="none">
+                      <g className="scope-grid"><path d="M0 25H600 M0 75H600 M0 125H600" /></g>
+                      {sampleReport.frames.map((frame, index) => index > 0 && frame.shot_index !== sampleReport.frames[index - 1].shot_index ? <line key={"cut-" + index} x1={index / Math.max(1, sampleReport.frames.length - 1) * 600} x2={index / Math.max(1, sampleReport.frames.length - 1) * 600} y1="8" y2="140" className="roi-boundary-line" /> : null)}
+                      {(["R", "G", "B"] as const).map(channel => {
+                        const values = sampleReport.frames.map(frame => frame.roi_measurement.channels[channel]?.mean ?? 0);
+                        const allValues = sampleReport.frames.flatMap(frame => (["R", "G", "B"] as const).map(key => frame.roi_measurement.channels[key]?.mean ?? 0));
+                        const low = Math.min(...allValues); const high = Math.max(...allValues); const span = Math.max(1e-9, high - low);
+                        const points = values.map((value, index) => `${index / Math.max(1, values.length - 1) * 600},${135 - ((value - low) / span) * 110}`).join(" ");
+                        return <polyline key={channel} className={"histogram-" + channel.toLowerCase()} points={points} fill="none" strokeWidth="2" />;
+                      })}
+                    </svg>
+                    <div className="temporal-trend-legend">{(["R", "G", "B"] as const).map(channel => <span key={channel}>{channel} · {sampleReport.frames[0]?.roi_measurement.channels[channel]?.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.roi_measurement.channels[channel]?.mean.toFixed(4) ?? "—"}</span>)}</div>
+                    <div className="roi-measurement-meta"><span>{sampleReport.frames[0]?.roi_measurement.pixel_count.toLocaleString() ?? "—"} pixels / sampled frame</span><span>{sampleReport.frames[0]?.roi_measurement.measurement_domain || "unknown decoder domain"}</span><span>Vertical markers: provisional shot-group boundaries</span></div>
+                  </div>
+                  <div className="consistency-unavailable"><b>Consistency diagnostics</b><span>Exposure drift: unavailable until validated scene-linear RGB is available</span><span>Luminance trend: unavailable until matrix and transfer are validated</span><span>Mixed-camera match: requires common validated working space</span></div>
                   <p>{sampleReport.note}</p>
                 </div>}
               </div>}

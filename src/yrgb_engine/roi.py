@@ -8,6 +8,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Any
 
+import numpy as np
+
 from .precision import PrecisionFrame
 
 
@@ -36,19 +38,18 @@ def measure_normalized_rgb_roi(
     top = min(frame.height - 1, int(y * frame.height))
     right = min(frame.width, max(left + 1, int((x + width) * frame.width + 0.999999)))
     bottom = min(frame.height, max(top + 1, int((y + height) * frame.height + 0.999999)))
-    sums = {"R": 0.0, "G": 0.0, "B": 0.0}
-    count = (right - left) * (bottom - top)
-    for row in range(top, bottom):
-        for col in range(left, right):
-            pixel = frame.pixel(col, row)
-            for name, channel_index in channel_map.items():
-                if name in sums:
-                    sums[name] += pixel[channel_index]
+    pixels = np.frombuffer(frame.samples, dtype=np.float32).reshape(
+        frame.height, frame.width, frame.channel_count
+    )[top:bottom, left:right, :]
+    means = {
+        name: float(pixels[:, :, channel_map[name]].mean(dtype=np.float64))
+        for name in ("R", "G", "B")
+    }
     return {
         "roi": {"x": x, "y": y, "width": width, "height": height, "coordinate_space": "normalized"},
         "pixel_bounds": {"left": left, "top": top, "right": right, "bottom": bottom},
-        "pixel_count": count,
+        "pixel_count": int((right - left) * (bottom - top)),
         "measurement_domain": frame.sample_domain,
-        "channels": {name: {"mean": total / count} for name, total in sums.items()},
+        "channels": {name: {"mean": value} for name, value in means.items()},
         "interpretation": "decoder_sample_domain_roi_mean; no camera transform or scene-linear interpretation",
     }
