@@ -22,6 +22,7 @@ def apply_cube_to_frame(
     *,
     lut_input_space_id: str,
     lut_output_space_id: str,
+    lut_output_transfer: str,
 ) -> PrecisionFrame:
     """Apply a LUT only when the frame's declared working space matches its input.
 
@@ -29,7 +30,7 @@ def apply_cube_to_frame(
     carry a reliable color-space contract, and matching a user-supplied label
     alone cannot certify the LUT's colorimetric correctness.
     """
-    if not lut_input_space_id.strip() or not lut_output_space_id.strip():
+    if not lut_input_space_id.strip() or not lut_output_space_id.strip() or not lut_output_transfer.strip():
         raise ImageExportError("Explicit LUT input and output space IDs are required.")
     if not frame.encoding.validated or not frame.encoding.working_space_id:
         raise ImageExportError("Input frame must have a validated working-space transform.")
@@ -52,7 +53,7 @@ def apply_cube_to_frame(
         output.extend(pixel)
     encoding = ColorEncoding(
         primaries="unknown",
-        transfer="unknown",
+        transfer=lut_output_transfer,
         matrix="unknown",
         range="unknown",
         reference="unknown",
@@ -104,6 +105,8 @@ def save_frame_image(
         raise ImageExportError("Output space ID must match the frame's declared working space.")
     if not output_transfer.strip():
         raise ImageExportError("An explicit output transfer function is required.")
+    if frame.encoding.transfer.casefold() != output_transfer.casefold():
+        raise ImageExportError("Output transfer must match the frame transfer declaration.")
     if not 1 <= quality <= 100:
         raise ImageExportError("JPEG quality must be between 1 and 100.")
     channels = {name.upper(): index for index, name in enumerate(frame.channel_names)}
