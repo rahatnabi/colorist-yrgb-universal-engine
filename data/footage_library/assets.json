@@ -58,7 +58,7 @@
       "decoder_report": null,
       "notes": [
         "Camera and recording details are transcribed from the user's summary of the Sony XML metadata; original XML and MP4 bytes have not been acquired or independently parsed.",
-        "10-bit is expected for the reported XAVC S-I 4:2:2 mode but remains unverified; pixel format and range are unknown.",
+        "10-bit remains a user-reported claim and is unverified; the XAVC S Long GOP versus XAVC S-I recording-mode classification, pixel format, and range remain unresolved or unknown.",
         "Lens reported: Tamron E 17-70mm F2.8 B070. Audio reported: 2-channel LPCM16.",
         "Suggested monitoring LUT reported: SL3SG3Ctos709.cube; LUT has not been acquired or validated.",
         "S-Log3 and S-Gamut3.Cine are retained as user-supplied metadata claims, not independently verified transforms.",
@@ -141,7 +141,7 @@
       "decoder_report": null,
       "notes": [
         "Camera and recording details are transcribed from the user's summary of the Sony XML metadata; original XML and MP4 bytes have not been acquired or independently parsed.",
-        "10-bit is expected for the reported XAVC S-I 4:2:2 mode but remains unverified; pixel format and range are unknown.",
+        "10-bit remains a user-reported claim and is unverified; the XAVC S Long GOP versus XAVC S-I recording-mode classification, pixel format, and range remain unresolved or unknown.",
         "Lens reported: Tamron E 17-70mm F2.8 B070. Audio reported: 2-channel LPCM16.",
         "Suggested monitoring LUT reported: SL3SG3Ctos709.cube; LUT has not been acquired or validated.",
         "S-Log3 and S-Gamut3.Cine are retained as user-supplied metadata claims, not independently verified transforms.",
