@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "profile_id": "sony.slog3.sgamut3cine",
+  "transform_id": "aces-v4.0.0.sony.slog3.sgamut3cine.to-davinci-intermediate-widegamut",
+  "source_space": "S-Log3 S-Gamut3.Cine",
+  "destination_space": "DaVinci Intermediate WideGamut",
+  "reference_set_id": "sony-slog3-sgamut3cine-independent-v1",
+  "reference_source": "",
+  "measurement_method": "",
+  "notes": "Template only. Populate vectors from traceable independent camera/reference measurements. Do not use synthetic identity values.",
+  "vectors": []
+}
