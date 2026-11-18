@@ -371,3 +371,22 @@ def test_transform_preview_runs_registry_gated_pipeline_for_approved_profile(tmp
     assert response.headers["x-yrgb-camera-transform-validated"] == "true"
     assert response.headers["x-yrgb-display-transform-validated"] == "false"
     assert response.headers["x-yrgb-preview-only"] == "true"
+
+
+def test_video_transform_preview_blocks_unverified_profile_before_decode():
+    registry = ProfileRegistry([{
+        "id": "apple.applelog",
+        "manufacturer": "Apple",
+        "encoding": "Apple Log",
+        "gamut": "BT.2020",
+        "status": "unverified",
+        "transform_id": None,
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/video-transform-preview?timestamp_seconds=3.5",
+        data={"profile_id": "apple.applelog"},
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 409
+    assert "not reference-validated" in response.json()["detail"]
