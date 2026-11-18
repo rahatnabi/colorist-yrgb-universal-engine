@@ -187,7 +187,7 @@ def test_lut_export_endpoint_resamples_cube_to_requested_size():
         "/v1/lut/export?size=35&title=Test Look",
         files={"file": ("source.cube", source, "text/plain")},
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, response.text
     assert 'filename="Test_Look_35pt.cube"' in response.headers["content-disposition"]
     from yrgb_engine.cube import parse_cube_text
     parsed = parse_cube_text(response.text)
