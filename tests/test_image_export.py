@@ -26,9 +26,12 @@ def _frame(channels=("R", "G", "B"), values=(0.2, 0.4, 0.6)):
 def test_apply_cube_requires_exact_validated_input_space():
     graded = apply_cube_to_frame(
         _frame(), _identity_lut(),
-        lut_input_space_id="test-linear", lut_output_space_id="display-test",\n        lut_output_transfer="sRGB",\n        lut_output_transfer="sRGB",
+        lut_input_space_id="test-linear",
+        lut_output_space_id="display-test",
+        lut_output_transfer="sRGB",
     )
     assert graded.encoding.working_space_id == "display-test"
+    assert graded.encoding.transfer == "sRGB"
     assert graded.encoding.validated is False
     assert list(graded.samples) == pytest.approx([0.2, 0.4, 0.6])
 
@@ -39,18 +42,22 @@ def test_apply_cube_rejects_unknown_or_mismatched_space():
         values=(0.2, 0.4, 0.6), source_path="x", decoder="x",
     )
     with pytest.raises(ImageExportError, match="validated"):
-        apply_cube_to_frame(unknown, _identity_lut(),
-                            lut_input_space_id="x", lut_output_space_id="y", lut_output_transfer="sRGB")
+        apply_cube_to_frame(
+            unknown, _identity_lut(), lut_input_space_id="x",
+            lut_output_space_id="y", lut_output_transfer="sRGB",
+        )
     with pytest.raises(ImageExportError, match="does not match"):
-        apply_cube_to_frame(_frame(), _identity_lut(),
-                            lut_input_space_id="wrong", lut_output_space_id="y", lut_output_transfer="sRGB")
+        apply_cube_to_frame(
+            _frame(), _identity_lut(), lut_input_space_id="wrong",
+            lut_output_space_id="y", lut_output_transfer="sRGB",
+        )
 
 
 def test_apply_cube_preserves_auxiliary_channels():
     frame = _frame(("R", "G", "B", "A"), (0.2, 0.4, 0.6, 0.75))
     graded = apply_cube_to_frame(
-        frame, _identity_lut(),
-        lut_input_space_id="test-linear", lut_output_space_id="display-test",
+        frame, _identity_lut(), lut_input_space_id="test-linear",
+        lut_output_space_id="display-test", lut_output_transfer="sRGB",
     )
     assert graded.pixel(0, 0) == pytest.approx((0.2, 0.4, 0.6, 0.75))
 
