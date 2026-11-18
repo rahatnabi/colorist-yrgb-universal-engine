@@ -1145,6 +1145,14 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
         Path(path).write_bytes(b"float32-master-fixture")
         return Path(path)
     monkeypatch.setattr("yrgb_engine.native_export.save_native_float_image", fake_writer)
+    monkeypatch.setattr(
+        "yrgb_engine.native_export.verify_native_float_export",
+        lambda _frame, _path: {
+            "verified": True, "sample_count": 6, "mismatch_count": 0,
+            "max_absolute_error": 0.0, "rmse": 0.0,
+            "sample_sha256_matches": True, "sample_sha256": "fixture",
+        },
+    )
     client = TestClient(create_app(registry=registry))
     response = client.post(
         "/v1/media/native-grade-export",
@@ -1157,6 +1165,9 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
     assert response.headers["x-yrgb-sample-format"] == "float32"
     assert response.headers["x-yrgb-sample-domain"] == "validated-scene-linear"
     assert response.headers["x-yrgb-clamped"] == "false"
+    assert response.headers["x-yrgb-roundtrip-verified"] == "true"
+    assert response.headers["x-yrgb-roundtrip-max-absolute-error"] == "0.0"
+    assert response.headers["x-yrgb-roundtrip-sha256-matches"] == "true"
     assert response.headers["x-yrgb-frame-width"] == "2"
     assert response.headers["x-yrgb-frame-height"] == "1"
     from yrgb_engine.native_export import native_frame_sha256
