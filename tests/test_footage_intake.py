@@ -1,12 +1,11 @@
 import hashlib
-import json
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from footage_intake import build_report, parse_xml_sidecar, sha256_file
+from footage_intake import build_report, parse_xml_sidecar, sha256_file  # noqa: E402
 
 
 def test_sha256_file_reads_in_chunks(tmp_path):
