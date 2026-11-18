@@ -17,7 +17,7 @@ type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_i
 type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
 type AlignmentComparison = {
-  reference_filename: string; candidate_filename: string;
+  reference_filename: string; candidate_filename: string; alignment_preview_data_url: string | null; alignment_preview_note: string;
   alignment: { method: string; reference_size: { width: number; height: number }; candidate_size: { width: number; height: number }; analysis_size: { width: number; height: number }; homography_candidate_to_reference: number[][]; good_matches: number; inliers: number; inlier_ratio: number; overlap_pixels: number; overlap_ratio: number };
   comparison: { measurement_domain: string; reference_sample_domain: string; candidate_sample_domain: string; sample_domain_match: boolean; comparability: string; channel_metrics: Record<"R" | "G" | "B", { reference_mean: number; candidate_aligned_mean: number; mean_delta_candidate_minus_reference: number; mean_absolute_difference: number; root_mean_square_difference: number }>; note: string };
 };
@@ -518,6 +518,7 @@ export default function App() {
             {alignmentNote && <div className="lut-export-note">{alignmentNote}</div>}
             {alignmentResult && <div className="alignment-results">
               <b>ALIGNMENT · {alignmentResult.alignment.inliers} / {alignmentResult.alignment.good_matches} feature inliers</b>
+              {alignmentResult.alignment_preview_data_url && <div className="alignment-overlay-preview"><img src={alignmentResult.alignment_preview_data_url} alt="50 percent reference and aligned candidate overlay" /><small>{alignmentResult.alignment_preview_note}</small></div>}
               <span>Overlap: {(alignmentResult.alignment.overlap_ratio * 100).toFixed(1)}% · Inlier ratio: {(alignmentResult.alignment.inlier_ratio * 100).toFixed(1)}%</span>
               <div className="alignment-channel-grid">{(["R", "G", "B"] as const).map(channel => <div key={channel}><b>{channel}</b><small>MEAN Δ (B − A)</small><strong>{alignmentResult.comparison.channel_metrics[channel].mean_delta_candidate_minus_reference.toFixed(5)}</strong><small>MEAN ABS DIFFERENCE</small><span>{alignmentResult.comparison.channel_metrics[channel].mean_absolute_difference.toFixed(5)}</span></div>)}</div>
               <p>{alignmentResult.comparison.note}</p>
