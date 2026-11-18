@@ -1,11 +1,10 @@
 # COLORIST YRGB — Dual Accuracy Scoring
 
-Status: **validated image-measurement integration for exposure, neutral-ROI white balance, and optional tonal fractions**. The scoring path accepts only explicitly validated linear-RGB PrecisionFrames.
+Status: **image-derived exposure, neutral-ROI white balance, tonal distribution, and optional reference percentile-curve scoring**. All scored measurements require an explicitly validated linear-RGB frame.
 
 ## Product rule
 
 Every exercise may report two independent results:
-
 1. **Correction Accuracy** — objective technical correction against declared, measurable targets.
 2. **Creative Look Similarity** — perceptual similarity to an explicitly selected creative reference.
 
@@ -17,16 +16,26 @@ Never combine these into one headline score.
 A learner- or exercise-selected ROI is measured in validated linear-light RGB. Mean luminance is compared with the exercise's declared gray reference in stops. No gray card or target exposure is inferred.
 
 ### White balance
-The same explicitly selected neutral ROI is measured for per-channel balance. Red, green and blue channel deviations from the exercise's declared neutral target are scored independently, then weighted as one white-balance family. The ROI must genuinely be neutral; the engine cannot determine that from RGB values alone.
+The same explicitly selected neutral ROI is measured for per-channel balance. Red, green and blue channel deviations from the exercise's declared neutral target are scored independently. The ROI must genuinely be neutral; the engine cannot determine that from RGB values alone.
 
-### Tonal structure
-The full frame is measured for shadow and highlight pixel fractions using exercise-defined thresholds in the declared linear-luminance domain. These fractions are scored only when the exercise supplies both thresholds and both target fractions. This is a compact tonal-distribution measure, not a complete artistic contrast judgement or a substitute for a calibrated display-referred waveform.
+### Reference-based tonal curve
+An exercise may provide a reference curve as seven monotonically non-decreasing linear-luminance values at fixed full-frame percentile anchors: P1, P10, P25, P50, P75, P90 and P99.
 
-The measurement also reports luminance percentiles (1st, 10th, 50th, 90th, 99th) for diagnostics. Percentiles are not yet scored against a reference curve.
+The candidate image is measured at the same anchors in the same validated linear working space. Each anchor is compared using absolute stop deviation:
+
+    abs(log2(candidate_luminance / reference_luminance))
+
+Each anchor receives its own component result; the seven components share the exercise-defined tonal-curve weight. The exercise controls tolerance, falloff, weight and a positive luminance floor. The floor stabilizes comparisons near black and must be selected deliberately for the exercise.
+
+This measures the distribution of luminance values, not spatial placement of tones. It does not establish that the subject, lighting, or artistic contrast is correct. Two images with different spatial arrangements can have similar percentile curves. For that reason, the feature is labelled **Reference Tonal Curve Accuracy**, not a full-image perceptual similarity score.
+
+If no reference curve is supplied, no curve score is emitted. The engine does not invent a target curve. Invalid, non-monotonic or incomplete reference anchors are rejected.
+
+### Shadow/highlight distribution
+The full frame may also be measured for shadow and highlight pixel fractions using exercise-defined thresholds in linear luminance. These are optional distribution diagnostics, not universal clipping limits or a substitute for a calibrated display-referred waveform.
 
 ### Scoring
 Each exercise supplies its own target values, ROI, thresholds, weights and tolerances. For an error e, tolerance tau, and exercise falloff k:
-
 - 100 when e <= tau.
 - Otherwise max(0, 100 * (1 - (e - tau) / (k * tau))).
 
@@ -41,8 +50,8 @@ This remains a separate future implementation. It requires validated color-manag
 ## 3. UI rules
 
 - Show Correction Accuracy and Creative Look Similarity separately.
-- Show component-level exposure, white-balance and tonal feedback.
-- Label tonal fractions and thresholds; do not present them as universal clipping limits.
+- Show exposure, white-balance, tonal-distribution and reference-curve component feedback.
+- Label the reference curve's working space, transform, percentile anchors, tolerance and luminance floor.
 - Preserve the learner's grade; scoring never modifies pixels or controls.
 - A score is not_scored when required pipeline or reference data is unverified.
 
