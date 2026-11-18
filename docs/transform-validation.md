@@ -4,7 +4,7 @@ An OCIO processor running without error does not prove that a camera transform i
 
 ## Validation record
 
-`TransformValidationResult` captures the exact transform ID, source and destination spaces, SHA-256 of a pinned OCIO config, reference-set ID, vector count, maximum absolute RGB error, tolerance, and OCIO version.
+`TransformValidationResult` captures the exact camera registry profile ID, transform ID, OCIO source/destination spaces, SHA-256 of a pinned OCIO config, reference-set ID, vector count, maximum absolute RGB error, tolerance, and OCIO version. Camera profile IDs and OCIO color-space names are separate identities; they must never be assumed to be the same string.
 
 Use `validate_ocio_config` with:
 - a pinned OCIO config file,
@@ -16,7 +16,7 @@ A synthetic identity test is useful for unit testing the gate only. It is not a 
 
 ## Applying a passing transform
 
-`apply_reference_validated_transform` checks that the record passed, the exact source/destination names match, and the config file hash is unchanged. Only then does it apply OCIO and mark the resulting frame validated in the declared destination space.
+`apply_reference_validated_transform` checks the frame's camera registry profile ID, validation profile ID, transform ID, exact OCIO source/destination names, and unchanged config hash. It also requires explicit destination transfer and primaries. Only then does it apply OCIO and mark the resulting frame validated in the declared destination space. `prepare_frame_for_working_space` performs the registry-driven orchestration and blocks unknown, unverified, or incomplete profiles.
 
 The caller must still declare the destination transfer function accurately. For DWG/Intermediate, the transfer is DaVinci Intermediate, not scene-linear. Exposure and linear-light operations must use an explicitly linear destination or a separate, validated conversion to linear light.
 
@@ -34,7 +34,10 @@ A passing result exposes `to_registry_record()`. The returned audit fields can b
 - `validation.passed=true`,
 - a 64-character config SHA-256,
 - a non-empty reference-set ID,
-- a positive reference-vector count.
+- a positive reference-vector count,
+- validation evidence bound to the same registry profile and transform IDs,
+- exact OCIO source/destination spaces matching the profile record,
+- declared output transfer and primaries.
 
 The web profile discovery panel displays whether a profile has independent reference-validation evidence. It does not provide a button to self-certify a profile. Registry catalogue entries remain unverified until real reference sets are added and reviewed.
 
@@ -59,3 +62,8 @@ Apple is represented by two distinct candidate records:
 - `Apple Log 2 / Apple Gamut`: a separate Apple-defined Log transfer function with Apple Gamut primaries; recording support begins with iPhone 17 Pro.
 
 Do not substitute Apple Log for Apple Log 2 or vice versa. Preserve transfer-function and color-primaries metadata from the media when available. Both registry entries remain unverified until independently checked against authoritative reference vectors and a pinned transform configuration.
+
+
+## Current implementation boundary
+
+The registry-driven preparation function is implemented and covered by synthetic unit tests. Those tests prove identity matching, config pinning, and fail-closed behavior; they do not validate any real camera transform. The current production catalogue still contains no approved camera-to-DWG/Intermediate transforms, so real media conversion correctly remains blocked until independent reference sets and approved OCIO configurations are supplied. DWG/Intermediate is not tagged as scene-linear; linear-light exposure tools must use a separate validated linear transform.
