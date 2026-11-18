@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 from dataclasses import asdict
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -368,6 +368,66 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             await file.close()
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
+
+    @app.post("/v1/look/export-cube")
+    async def export_parametric_look(payload: dict[str, Any] = Body(...)) -> Response:
+        """Bake user-specified linear-RGB look controls into a 3D .cube LUT."""
+        from .look import LookDevelopmentError, LookSettings, bake_3d_cube
+
+        try:
+            size = int(payload.get("size", 35))
+            title = str(payload.get("title", "COLORIST YRGB Look"))
+            input_space_id = str(payload.get("input_space_id", "")).strip()
+            input_transfer = str(payload.get("input_transfer", "")).casefold()
+            if input_transfer not in {"linear", "linear-light", "scene-linear"}:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Look LUT baking requires an explicitly declared linear RGB input transfer.",
+                )
+            raw_settings = payload.get("settings", {})
+            if not isinstance(raw_settings, dict):
+                raise HTTPException(status_code=422, detail="Settings must be a JSON object.")
+            allowed = {
+                "exposure_stops", "contrast", "pivot", "saturation",
+                "temperature_shift", "tint_shift", "luminance_coefficients",
+                "master_curve",
+            }
+            unknown = set(raw_settings) - allowed
+            if unknown:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Unknown look settings: {', '.join(sorted(unknown))}.",
+                )
+            if "luminance_coefficients" in raw_settings:
+                raw_settings["luminance_coefficients"] = tuple(raw_settings["luminance_coefficients"])
+            if "master_curve" in raw_settings:
+                raw_settings["master_curve"] = tuple(
+                    tuple(point) for point in raw_settings["master_curve"]
+                )
+            settings = LookSettings(**raw_settings)
+            content = await run_in_threadpool(
+                bake_3d_cube,
+                settings,
+                size=size,
+                title=title,
+                input_space_id=input_space_id,
+            )
+            safe_name = "".join(
+                char for char in title if char.isalnum() or char in "-_ "
+            ).strip().replace(" ", "_") or "YRGB_Look"
+            return Response(
+                content=content,
+                media_type="text/plain; charset=utf-8",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{safe_name}_{size}pt.cube"',
+                    "X-YRGB-Input-Space": input_space_id,
+                    "X-YRGB-Input-Transfer": input_transfer,
+                },
+            )
+        except HTTPException:
+            raise
+        except (LookDevelopmentError, TypeError, ValueError, OverflowError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/v1/lut/export")
     async def export_cube_lut(
