@@ -289,6 +289,19 @@ export default function App() {
                     <span>Δ histogram {frame.histogram_distance === null ? "—" : frame.histogram_distance.toFixed(3)}</span>
                     {frame.shot_change_candidate ? <b className="candidate-flag">CHANGE CANDIDATE</b> : <small>—</small>}
                   </div>)}</div>
+                  <div className="temporal-trend-panel">
+                    <div className="sample-control-heading"><b>RGB Temporal Trend</b><span>DECODED FRAME MEANS · NOT LINEAR LIGHT</span></div>
+                    <svg viewBox="0 0 600 150" role="img" aria-label="Per-frame decoded RGB channel mean trend" preserveAspectRatio="none">
+                      <g className="scope-grid"><path d="M0 25H600 M0 75H600 M0 125H600" /></g>
+                      {(["R", "G", "B"] as const).map(channel => {
+                        const values = sampleReport.frames.map(frame => frame.channels[channel]?.mean ?? 0);
+                        const low = Math.min(...values); const high = Math.max(...values); const span = Math.max(1e-9, high - low);
+                        const points = values.map((value, index) => `${index / Math.max(1, values.length - 1) * 600},${135 - ((value - low) / span) * 110}`).join(" ");
+                        return <polyline key={channel} className={"histogram-" + channel.toLowerCase()} points={points} fill="none" strokeWidth="2" />;
+                      })}
+                    </svg>
+                    <div className="temporal-trend-legend"><span>R · {sampleReport.frames[0]?.channels.R.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.R.mean.toFixed(4) ?? "—"}</span><span>G · {sampleReport.frames[0]?.channels.G.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.G.mean.toFixed(4) ?? "—"}</span><span>B · {sampleReport.frames[0]?.channels.B.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.channels.B.mean.toFixed(4) ?? "—"}</span></div>
+                  </div>
                   <div className="consistency-unavailable"><b>Consistency diagnostics</b><span>Exposure drift: requires validated linear RGB + selected ROI</span><span>Neutral region: requires validated linear RGB</span><span>Mixed-camera match: requires common validated working space</span></div>
                   <p>{sampleReport.note}</p>
                 </div>}
