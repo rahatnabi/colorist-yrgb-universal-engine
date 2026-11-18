@@ -55,3 +55,14 @@ Store source timecode values verbatim. Store calculated frame-offset timecodes s
 - Independent reference data for any color-transform validation claim.
 
 A decoder success validates neither a camera transform nor colorimetric accuracy. `reference_validated` requires traceable independent reference vectors or measured chart data and a documented tolerance.
+
+
+## Automated declaration reconciliation
+
+The engine's metadata reconciliation compares the XML fields CaptureGammaEquation, CaptureColorPrimaries and CodingEquations against stream color_transfer, color_primaries and color_space tags. It preserves raw values and produces per-field states:
+
+- reported: normalized declarations agree; this is not transform validation.
+- conflict: both sources declare values and they disagree.
+- unresolved: at least one declaration is missing.
+
+No camera profile, Log curve or gamut is inferred from the camera model, filename, or LUT name.
