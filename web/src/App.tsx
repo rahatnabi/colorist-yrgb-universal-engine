@@ -67,6 +67,10 @@ export default function App() {
   const [gamut, setGamut] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileNote, setProfileNote] = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [transformPreviewUrl, setTransformPreviewUrl] = useState("");
+  const [transformPreviewNote, setTransformPreviewNote] = useState("");
+  const [transformPreviewBusy, setTransformPreviewBusy] = useState(false);
   const [lutFile, setLutFile] = useState<File | null>(null);
   const [lutSize, setLutSize] = useState("35");
   const [lutNote, setLutNote] = useState("");
@@ -99,7 +103,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setBusy(true);
+    setFile(selected); setProbe(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -178,6 +182,25 @@ export default function App() {
               <div className="media-meta"><div className="file-title">{isVideo ? <Film size={15} /> : <FileImage size={15} />}<b>{file.name}</b></div><span>{formatBytes(file.size)} · {file.type || "Unknown MIME type"}</span>
                 {busy ? <span className="processing"><LoaderCircle size={14} /> Inspecting media metadata…</span> : probe ? <span className="success-line"><CheckCircle2 size={14} /> Probe complete · {probe.probe.status || "unknown"}</span> : null}
               </div>
+              {isImage && <div className="transform-preview-control">
+                <div><b>REFERENCE-GATED COLOR PREVIEW</b><small>{selectedProfileId ? "Selected profile: " + selectedProfileId : "Select an exact camera profile below first."}</small></div>
+                <button type="button" className="primary-button" disabled={!apiOnline || !selectedProfileId || transformPreviewBusy} onClick={async () => {
+                  if (!file || !selectedProfileId) return;
+                  setTransformPreviewBusy(true); setTransformPreviewNote("Preparing validated camera transform and preview-only display conversion…");
+                  try {
+                    const body = new FormData(); body.append("file", file); body.append("profile_id", selectedProfileId);
+                    const response = await fetch(API_BASE + "/v1/media/transform-preview", { method: "POST", body });
+                    if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Transform preview failed"); }
+                    const blob = await response.blob(); const url = URL.createObjectURL(blob);
+                    if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl);
+                    setTransformPreviewUrl(url);
+                    setTransformPreviewNote("Preview only. Display conversion is not a mastering/export validation.");
+                  } catch (err) { setTransformPreviewNote(err instanceof Error ? err.message : "Transform preview failed"); }
+                  finally { setTransformPreviewBusy(false); }
+                }}>{transformPreviewBusy ? "Preparing…" : "Render color-managed preview"}</button>
+                {transformPreviewNote && <p className="profile-note">{transformPreviewNote}</p>}
+                {transformPreviewUrl && <img className="transform-preview-image" src={transformPreviewUrl} alt="Reference-gated color transform preview" />}
+              </div>}
               {probe && <div className="probe-details"><div><small>DETECTED TYPE</small><b>{probe.probe.detected_type || "Unknown"}</b></div><div><small>FILE SIGNATURE</small><b>{probe.probe.signature || "Unknown"}</b></div><div><small>PROBE STATUS</small><b>{probe.probe.status || "Unknown"}</b></div></div>}
               {probe?.probe.warnings?.length ? <div className="warning-line">{probe.probe.warnings.join(" · ")}</div> : null}
               {isVideo && <div className="video-frame-control">
@@ -246,7 +269,7 @@ export default function App() {
               <button className="primary-button" type="submit" disabled={!apiOnline}><ScanSearch size={15} /> Find exact candidates</button>
             </form>
             {profileNote && <p className="profile-note">{profileNote}</p>}
-            {profiles.map(profile => <div className="profile-result" key={profile.id}><div><b>{profile.encoding} · {profile.gamut || "Gamut unspecified"}</b><small>{profile.manufacturer} / {profile.id}</small></div><span className={profile.usable_for_transform ? "verified" : "unverified"}>{profile.usable_for_transform ? "REFERENCE VALIDATED" : "NOT VALIDATED"}</span><small className="profile-validation-note">{profile.validation_status || "not_reference_validated"} · {profile.resolution_note || "No independent validation record."}</small></div>)}
+            {profiles.map(profile => <div className="profile-result" key={profile.id}><div><b>{profile.encoding} · {profile.gamut || "Gamut unspecified"}</b><small>{profile.manufacturer} / {profile.id}</small></div><span className={profile.usable_for_transform ? "verified" : "unverified"}>{profile.usable_for_transform ? "REFERENCE VALIDATED" : "NOT VALIDATED"}</span><small className="profile-validation-note">{profile.validation_status || "not_reference_validated"} · {profile.resolution_note || "No independent validation record."}</small><button type="button" className="profile-select-button" onClick={() => { setSelectedProfileId(profile.id); setTransformPreviewNote(profile.usable_for_transform ? "Profile selected. You can now render a preview." : "Profile selected for inspection only; transform remains blocked until reference validation."); }}>{selectedProfileId === profile.id ? "SELECTED" : "Select profile"}</button></div>)}
             <div className="profile-warning">Profile discovery does not apply a transform. Verify camera model, gamut and transfer function before processing.</div>
           </section>
         </div>
