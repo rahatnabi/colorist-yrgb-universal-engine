@@ -76,6 +76,21 @@ Each clip has its own manifest record (`sony-slog3cine-c1382` and `sony-slog3cin
 
 **Metadata summary received:** the user supplied a transcription of Sony FX30 XML metadata for these clips: ILME-FX30, Tamron E 17–70mm F2.8 B070, 3840×2160, XAVC S-I / AVC H.264 High 4:2:2 Profile Level 5.1, 4:2:2, 25.00p, S-Log3, S-Gamut3.Cine, Rec.709 coding equations, and 2-channel LPCM16 audio. The reported duration is 324 frames (12.96 s at 25 fps), with start timecode `12364108`; the reported related LUT is `SL3SG3Ctos709.cube`.
 
+Clip-specific details were subsequently supplied for each sidecar:
+
+| Field | C1382 | C1383 |
+|---|---:|---:|
+| Creation datetime | 2026-04-29 03:05:59 +06:00 | 2026-04-29 03:06:45 +06:00 |
+| Duration | 192 frames / 7.68 s | 228 frames / 9.12 s |
+| Start timecode (reported) | 00:12:47:08 | 17:19:47:08 |
+| End timecode (reported) | 16:19:47:08 | 19:28:47:08 |
+| Audio (reported) | 2-channel LPCM 16-bit | 2-channel LPCM 16-bit |
+| UMID reference | 060A2B34...45AE7D (truncated) | 060A2B34...45AE7D (truncated) |
+
+The clip-specific transcription supersedes the earlier shared 324-frame duration note. The supplied UMID is truncated and identical in both summaries, so it cannot identify either clip uniquely. The reported start/end timecodes also appear inconsistent with the short durations; preserve them verbatim but do not use them for synchronization until checked against the original sidecars/timecode tracks.
+
+**Codec ambiguity to resolve:** the latest transcription gives `AVC140_3840_2160_H422P@L51` and describes XAVC S / H.264 Long GOP, whereas the earlier summary called the recording XAVC S-I. The manifest preserves the exact reported string and records the GOP/recording-mode classification as unresolved. Do not infer Long GOP versus All-Intra from the label alone. 10-bit and 4:2:2 are user-reported claims; stream pixel format and bit depth remain unverified. The reported `SL3SG3Ctos709.cube` is a monitoring/conversion LUT reference, not evidence that the source is already Rec.709 or that the LUT has been validated.
+
 This is a **user-supplied summary**, not a parsed XML file. Therefore the manifest records the reported values but deliberately leaves bit depth, pixel format, and range unknown. Although 10-bit is expected for this recording mode, it must be verified from the original stream/XML rather than assumed. The reported Rec.709 coding equations are stored separately from the S-Log3 transfer and S-Gamut3.Cine primaries; they are not treated as evidence that the footage is already Rec.709. The original media bytes have not yet been imported or hashed by this repository.
 
 For the initial intake, preserve the user-declared S-Log3 / S-Gamut3.Cine as an annotation with provenance `user_asserted`; do not let it automatically approve or apply a transform. The capture matcher must still check exact camera model and available metadata, and the camera transform remains unverified until independent reference vectors pass the validation gate.
