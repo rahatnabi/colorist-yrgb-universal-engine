@@ -71,6 +71,7 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     setNativePreviewUrl("");
     setMeasurementResult(null);
     setMeasurementStatus("Grade controls or source changed · run native measurements again.");
+    setMasterStatus("Grade controls or source changed · export the full-resolution master again.");
     setNativeStatus(profileId
       ? "Grade controls changed · render again to refresh the native result."
       : "Select a reference-validated camera profile to enable native rendering.");
