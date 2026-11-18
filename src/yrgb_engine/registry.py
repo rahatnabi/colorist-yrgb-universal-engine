@@ -88,6 +88,54 @@ class ProfileRegistry:
             )
         return record
 
+    def find_candidates(
+        self,
+        *,
+        manufacturer: str,
+        encoding: str | None = None,
+        gamut: str | None = None,
+        camera_model: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return possible profile choices without selecting or guessing one.
+
+        When gamut is omitted, matching gamut variants are returned as separate
+        choices and each record carries a gamut_choice requirement. Profiles
+        restricted to named camera models require an explicit compatible model.
+        """
+        if not isinstance(manufacturer, str) or not manufacturer.strip():
+            return []
+        if encoding is not None and (
+            not isinstance(encoding, str) or not encoding.strip()
+        ):
+            return []
+        if gamut is not None and (
+            not isinstance(gamut, str) or not gamut.strip()
+        ):
+            return []
+
+        candidates = []
+        for profile in self._profiles:
+            if profile["manufacturer"].casefold() != manufacturer.casefold():
+                continue
+            if encoding is not None and profile["encoding"].casefold() != encoding.casefold():
+                continue
+            if gamut is not None and (profile.get("gamut") or "").casefold() != gamut.casefold():
+                continue
+            models = profile.get("camera_models", [])
+            if camera_model is not None and models and not any(
+                camera_model.casefold() == model.casefold() for model in models
+            ):
+                continue
+            record = self._resolved_record(profile)
+            requirements = []
+            if gamut is None:
+                requirements.append("gamut_choice")
+            if models and camera_model is None:
+                requirements.append("camera_model")
+            record["selection_requirements"] = requirements
+            candidates.append(record)
+        return candidates
+
     def resolve(
         self,
         *,
