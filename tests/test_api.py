@@ -1168,6 +1168,7 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
     assert response.headers["x-yrgb-roundtrip-verified"] == "true"
     assert response.headers["x-yrgb-roundtrip-max-absolute-error"] == "0.0"
     assert response.headers["x-yrgb-roundtrip-sha256-matches"] == "true"
+    assert response.headers["x-yrgb-delivery-qc-status"] == "not_requested"
     assert response.headers["x-yrgb-frame-width"] == "2"
     assert response.headers["x-yrgb-frame-height"] == "1"
     from yrgb_engine.native_export import native_frame_sha256
@@ -1222,3 +1223,20 @@ def test_cors_exposes_native_master_metadata_headers():
     assert "x-yrgb-frame-width" in exposed
     assert "x-yrgb-frame-height" in exposed
     assert "x-yrgb-float-samples-sha256" in exposed
+
+
+def test_native_grade_export_requires_complete_delivery_qc_roi():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/native-grade-export",
+        data={
+            "profile_id": "unused.profile",
+            "export_format": "exr",
+            "roi_x": "0",
+            "roi_y": "0",
+            "roi_width": "16",
+        },
+        files={"file": ("still.tif", b"fixture", "image/tiff")},
+    )
+    assert response.status_code == 422
+    assert "x, y, width and height together" in response.json()["detail"]
