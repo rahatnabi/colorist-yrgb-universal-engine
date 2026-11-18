@@ -9,7 +9,7 @@ def test_missing_file(tmp_path):
 
 def test_png_signature_detected_without_optional_decoder(tmp_path):
     image = tmp_path / "sample.png"
-    image.write_bytes(b"\\x89PNG\\r\\n\\x1a\\n" + b"0" * 24)
+    image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 24)
     result = probe_media(image)
     assert result.detected_type == "image"
     assert result.signature == "png"
