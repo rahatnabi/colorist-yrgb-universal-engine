@@ -50,6 +50,9 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
   const [nativePreviewUrl, setNativePreviewUrl] = useState("");
   const [nativeStatus, setNativeStatus] = useState("Select a reference-validated camera profile to enable native rendering.");
   const [nativeBusy, setNativeBusy] = useState(false);
+  const [masterFormat, setMasterFormat] = useState<"exr" | "tiff">("exr");
+  const [masterBusy, setMasterBusy] = useState(false);
+  const [masterStatus, setMasterStatus] = useState("Full-resolution export requires a reference-validated camera profile.");
   const [roi, setRoi] = useState({ x: 0, y: 0, width: 1, height: 1 });
   const [measurementBusy, setMeasurementBusy] = useState(false);
   const [measurementStatus, setMeasurementStatus] = useState("Choose a neutral reference region in the source still.");
@@ -272,6 +275,47 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     }
   }
 
+
+  async function exportNativeMaster() {
+    if (!sourceFile || !profileId) return;
+    setMasterBusy(true);
+    setMasterStatus("Processing the full-resolution still in the native float32 pipeline…");
+    try {
+      const body = new FormData();
+      body.append("file", sourceFile);
+      body.append("profile_id", profileId);
+      body.append("export_format", masterFormat);
+      if (cameraModel) body.append("camera_model", cameraModel);
+      body.append("exposure_stops", String(settings.exposure_stops));
+      body.append("contrast", String(settings.contrast));
+      body.append("pivot", String(settings.pivot));
+      body.append("saturation", String(settings.saturation));
+      body.append("temperature_shift", String(settings.temperature_shift));
+      body.append("tint_shift", String(settings.tint_shift));
+      body.append("curve_midpoint", String(curveMidpoint));
+      const response = await fetch(apiBase + "/v1/media/native-grade-export", { method: "POST", body });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Native master export failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename.replace(/\\.[^.]+$/, "") + "_YRGB_master." + (masterFormat === "exr" ? "exr" : "tiff");
+      anchor.click();
+      URL.revokeObjectURL(url);
+      const width = response.headers.get("X-YRGB-Frame-Width") || "?";
+      const height = response.headers.get("X-YRGB-Frame-Height") || "?";
+      const digest = response.headers.get("X-YRGB-Float-Samples-SHA256") || "not supplied";
+      setMasterStatus("Full-resolution float32 " + masterFormat.toUpperCase() + " exported · " + width + " × " + height + " · unclamped · sample SHA-256 " + digest.slice(0, 16) + "…");
+    } catch (error) {
+      setMasterStatus(error instanceof Error ? error.message : "Native master export failed.");
+    } finally {
+      setMasterBusy(false);
+    }
+  }
+
   function exportPreview() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -303,6 +347,22 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       <span>{nativeStatus}</span>
     </div>
 
+
+    <div className="native-master-export">
+      <div className="native-measurements-heading"><b>FULL-RESOLUTION FLOAT MASTER</b><span>NO DISPLAY CLAMP</span></div>
+      <p>Exports the native graded scene-linear frame at source resolution. This is not the browser preview PNG. Only reference-validated camera transforms are accepted.</p>
+      <div className="native-master-controls">
+        <label htmlFor="yrgb-master-format">FORMAT</label>
+        <select id="yrgb-master-format" value={masterFormat} onChange={event => setMasterFormat(event.target.value as "exr" | "tiff")}>
+          <option value="exr">OpenEXR · float32</option>
+          <option value="tiff">TIFF · float32</option>
+        </select>
+        <button type="button" className="preview-export-button" disabled={!sourceFile || !profileId || masterBusy} onClick={exportNativeMaster}>
+          {masterBusy ? "EXPORTING FULL-RESOLUTION MASTER…" : "EXPORT FLOAT MASTER"}
+        </button>
+      </div>
+      <span className="native-measurement-status">{masterStatus}</span>
+    </div>
     <div className="native-measurements-panel">
       <div className="native-measurements-heading"><b>NATIVE SCOPE & CORRECTION MEASUREMENTS</b><span>VALIDATED LINEAR FRAME</span></div>
       <p>Choose a neutral reference ROI in the original still. Coordinates are full-resolution source pixels, not the resized browser preview. Minimum sample area: 16 pixels; the initial 1 × 1 values are placeholders, not a selected gray reference.</p>
