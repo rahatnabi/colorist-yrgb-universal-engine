@@ -189,3 +189,61 @@ def apply_look_to_frame(
         purpose="grading_candidate",
         metadata={**frame.metadata, "yrgb_look_applied": True},
     )
+
+
+def apply_look_to_declared_linear_frame(
+    frame: PrecisionFrame,
+    settings: LookSettings,
+    *,
+    input_space_id: str,
+    linear_input_confirmed: bool,
+) -> PrecisionFrame:
+    """Apply a look when the operator explicitly attests the source is linear.
+
+    Unlike apply_look_to_frame, this path does not mark the frame or transform
+    as validated. It is suitable for scene-linear float interchange only.
+    """
+    validate_look(settings)
+    if not linear_input_confirmed:
+        raise LookDevelopmentError("Explicit confirmation that the source is linear RGB is required.")
+    if frame.encoding.validated:
+        raise LookDevelopmentError(
+            "Use apply_look_to_frame for frames that already carry a validated transform."
+        )
+    if not input_space_id.strip():
+        raise LookDevelopmentError("An explicit linear working-space ID is required.")
+    if frame.encoding.transfer.casefold() not in {"unknown", "linear", "linear-light", "scene-linear"}:
+        raise LookDevelopmentError("Source metadata declares a non-linear transfer; refusing linear look processing.")
+    if frame.encoding.working_space_id not in {None, input_space_id}:
+        raise LookDevelopmentError("Source working-space metadata conflicts with the selected look space.")
+    channel_indices = {name.upper(): index for index, name in enumerate(frame.channel_names)}
+    if not all(name in channel_indices for name in ("R", "G", "B")):
+        raise LookDevelopmentError("Frame must contain named R, G and B channels.")
+    indices = tuple(channel_indices[name] for name in ("R", "G", "B"))
+    output = array("f")
+    for offset in range(0, len(frame.samples), frame.channel_count):
+        pixel = list(frame.samples[offset : offset + frame.channel_count])
+        graded = apply_look_rgb(tuple(pixel[index] for index in indices), settings)
+        for index, value in zip(indices, graded):
+            pixel[index] = value
+        output.extend(pixel)
+    encoding = replace(
+        frame.encoding,
+        transfer="scene-linear",
+        metadata_source="operator-declared scene-linear source; not transform-validated",
+        validated=False,
+        working_space_id=input_space_id,
+        transform_id=f"yrgb-look-unvalidated:{input_space_id}",
+    )
+    return PrecisionFrame(
+        width=frame.width,
+        height=frame.height,
+        channel_names=frame.channel_names,
+        samples=output,
+        source_path=frame.source_path,
+        decoder=frame.decoder,
+        encoding=encoding,
+        sample_domain="operator-declared_scene_linear_look_output",
+        purpose="unvalidated_scene_linear_render",
+        metadata={**frame.metadata, "yrgb_look_applied": True, "linear_input_operator_confirmed": True},
+    )
