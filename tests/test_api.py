@@ -408,3 +408,78 @@ def test_ocio_status_reports_missing_config_file(monkeypatch, tmp_path):
     response = client.get("/v1/ocio/status")
     assert response.status_code == 200
     assert response.json()["status"] == "config_file_missing"
+
+
+def test_video_transform_preview_uses_requested_timestamp_for_approved_profile(tmp_path, monkeypatch):
+    import hashlib
+    from dataclasses import replace
+    from pathlib import Path
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "pinned.ocio"
+    config.write_text("video-pinned-config")
+    profile_id = "test.video.profile"
+    source_space = "Test Video Log"
+    working_space = "DaVinci Intermediate WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id,
+        "manufacturer": "Test",
+        "encoding": "Test Video Log",
+        "gamut": "Test Gamut",
+        "status": "verified",
+        "transform_id": "test.video.to.dwg",
+        "ocio_source_space": source_space,
+        "ocio_destination_space": working_space,
+        "output_transfer": "DaVinci Intermediate",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True,
+            "profile_id": profile_id,
+            "transform_id": "test.video.to.dwg",
+            "source_space": source_space,
+            "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-video-reference",
+            "vector_count": 10,
+            "max_absolute_error": 0.00001,
+            "tolerance": 0.0001,
+            "ocio_version": "test",
+        },
+    }])
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.3, 0.4, 0.5), source_path="fixture", decoder="test-ffmpeg",
+        encoding=ColorEncoding(),
+    )
+    seen = {}
+    def fake_decode(_path, *, timestamp_seconds):
+        seen["timestamp"] = timestamp_seconds
+        return frame
+
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_decode)
+    monkeypatch.setattr("yrgb_engine.transform_validation.transform_frame", lambda source, **_kwargs: source)
+    monkeypatch.setattr(
+        "yrgb_engine.ocio.transform_frame",
+        lambda source, **_kwargs: replace(
+            source, encoding=replace(source.encoding, profile_id="Preview sRGB")
+        ),
+    )
+    monkeypatch.setattr(
+        "yrgb_engine.preview.save_preview_png",
+        lambda _frame, path, **_kwargs: (Path(path).write_bytes(b"video-preview-fixture"), Path(path))[1],
+    )
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    monkeypatch.setenv("YRGB_PREVIEW_SPACE", "Preview sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_TRANSFER", "sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_PRIMARIES", "BT.709")
+
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/video-transform-preview?timestamp_seconds=4.25",
+        data={"profile_id": profile_id},
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 200, response.text
+    assert seen["timestamp"] == 4.25
+    assert response.headers["x-yrgb-frame-timestamp"] == "4.25"
+    assert response.headers["x-yrgb-preview-only"] == "true"
