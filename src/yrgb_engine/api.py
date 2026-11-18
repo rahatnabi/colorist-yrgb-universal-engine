@@ -303,6 +303,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     },
                 )
                 output = []
+                signals = []
                 for report in reports:
                     output.append({
                         "timestamp_seconds": report.timestamp_seconds,
@@ -313,10 +314,28 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                         "shot_change_candidate": report.shot_change_candidate,
                         "channels": {key: asdict(value) for key, value in report.analysis.channels.items()},
                     })
-                return output
+                from .shot_consistency import ShotFrameSignal, group_sampled_shots
+
+                signals = [
+                    ShotFrameSignal(
+                        frame_index=item["frame_index"],
+                        timestamp_seconds=item["timestamp_seconds"],
+                        histogram_distance=item["histogram_distance"],
+                        change_candidate=item["shot_change_candidate"],
+                    )
+                    for item in output
+                ]
+                groups = group_sampled_shots(signals)
+                for group in groups:
+                    for item in output:
+                        if group.start_frame_index <= item["frame_index"] <= group.end_frame_index:
+                            item["shot_index"] = group.shot_index
+                return {"frames": output, "shot_groups": [asdict(group) for group in groups]}
 
             try:
-                frames = await run_in_threadpool(analyze_sample)
+                sample_result = await run_in_threadpool(analyze_sample)
+                frames = sample_result["frames"]
+                shot_groups = sample_result["shot_groups"]
             except HighPrecisionDecodeError as exc:
                 if "required" in str(exc).lower() or "install ffmpeg" in str(exc).lower():
                     raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -331,7 +350,13 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 "shot_change_threshold": shot_change_threshold,
                 "sample_domain": "source sample-domain; no input transform applied",
                 "frames": frames,
-                "note": "Histogram distance is a distribution-change candidate, not a semantic cut detector. Channel mean deltas are sample-domain values, not exposure stops.",
+                "shot_groups": shot_groups,
+                "consistency_status": {
+                    "exposure_drift": "unavailable_without_validated_linear_rgb_and_user_roi",
+                    "neutral_region": "unavailable_without_validated_linear_rgb",
+                    "mixed_camera_color": "requires_validated_common_working_space_and_explicit_colorimetric_parameters",
+                },
+                "note": "Shot groups are provisional histogram-change groups, not confirmed semantic cuts. Histogram distance is a distribution-change candidate, not a semantic cut detector. Channel mean deltas are sample-domain values, not exposure stops.",
             }
         except HTTPException:
             raise
