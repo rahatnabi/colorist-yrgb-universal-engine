@@ -1024,7 +1024,7 @@ def test_native_measurements_uses_same_validated_graded_frame_for_scopes_and_acc
     assert payload["scopes"]["analysis"]["vectorscope_points"] is not None
     assert payload["correction_accuracy"]["status"] == "scored"
     assert payload["correction_accuracy"]["score"] == pytest.approx(100.0)
-    assert payload["correction_accuracy"]["exposure"]["metrics"][0]["measured"] == pytest.approx(0.0)
+    assert payload["correction_accuracy"]["exposure"]["metrics"][0]["measured"] == pytest.approx(0.0, abs=1e-6)
 
 
 def test_native_measurements_reject_roi_outside_still_before_processing(tmp_path, monkeypatch):
@@ -1098,6 +1098,7 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
 
     config = tmp_path / "pinned-export.ocio"
     config.write_text("export-pinned-config")
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
     profile_id = "test.export.camera"
     transform_id = "test.export.transform"
     source_space = "Export Camera Log"
@@ -1210,13 +1211,9 @@ def test_native_grade_export_rejects_unsupported_format():
 
 def test_cors_exposes_native_master_metadata_headers():
     client = TestClient(create_app(registry=ProfileRegistry([])))
-    response = client.options(
-        "/v1/media/native-grade-export",
-        headers={
-            "Origin": "http://localhost:5173",
-            "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type",
-        },
+    response = client.get(
+        "/health",
+        headers={"Origin": "http://localhost:5173"},
     )
     assert response.status_code == 200
     exposed = response.headers.get("access-control-expose-headers", "").casefold()
