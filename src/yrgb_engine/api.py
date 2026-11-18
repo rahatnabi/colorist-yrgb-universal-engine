@@ -692,7 +692,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     "X-YRGB-Display-Transform-Validated": "false",
                     "X-YRGB-Working-Space": str(profile["ocio_destination_space"]),
                 },
-                background=BackgroundTask(lambda: Path(preview_path).unlink(missing_ok=True)),
+                background=BackgroundTask(lambda cleanup_path=preview_path: Path(cleanup_path).unlink(missing_ok=True)),
             )
             preview_path = None
             return response
