@@ -57,16 +57,23 @@ def validate_look(settings: LookSettings) -> None:
 
 
 def _curve(value: float, points: tuple[tuple[float, float], ...]) -> float:
-    # Piecewise-linear interpolation with endpoint extension; LUT input domain is 0..1.
-    if value <= points[0][0]:
-        return points[0][1]
-    if value >= points[-1][0]:
-        return points[-1][1]
-    for (x0, y0), (x1, y1) in zip(points, points[1:]):
-        if x0 <= value <= x1:
-            amount = (value - x0) / (x1 - x0)
-            return y0 * (1.0 - amount) + y1 * amount
-    raise LookDevelopmentError("Could not evaluate master curve.")
+    # Piecewise-linear interpolation with linear endpoint extrapolation.
+    # Preserve scene-linear headroom and negative values; never clip LUT output.
+    segments = tuple(zip(points, points[1:]))
+    if value < points[0][0]:
+        x0, y0 = segments[0][0]
+        x1, y1 = segments[0][1]
+    elif value > points[-1][0]:
+        x0, y0 = segments[-1][0]
+        x1, y1 = segments[-1][1]
+    else:
+        for (x0, y0), (x1, y1) in segments:
+            if x0 <= value <= x1:
+                break
+        else:
+            raise LookDevelopmentError("Could not evaluate master curve.")
+    amount = (value - x0) / (x1 - x0)
+    return y0 * (1.0 - amount) + y1 * amount
 
 
 def apply_look_rgb(
