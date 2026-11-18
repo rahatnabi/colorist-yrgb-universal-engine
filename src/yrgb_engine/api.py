@@ -1301,6 +1301,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 raise HTTPException(status_code=413, detail="Decoded still exceeds the 40 megapixel limit.")
             if roi_x + roi_width > frame.width or roi_y + roi_height > frame.height:
                 raise HTTPException(status_code=422, detail="Neutral ROI must lie entirely inside the decoded still.")
+            if roi_width * roi_height < 16:
+                raise HTTPException(status_code=422, detail="Neutral ROI must contain at least 16 pixels for a stable measurement.")
 
             frame = replace(
                 frame,
