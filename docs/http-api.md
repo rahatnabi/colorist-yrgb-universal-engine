@@ -76,3 +76,19 @@ and evaluates its existing 1D/3D/combined transform while resampling. Resampling
 does not create new look detail beyond the source LUT. The .cube format does not
 reliably carry a color-space contract, so users must keep track of the intended
 input and output color spaces separately.
+
+
+## Provisional shot grouping
+
+The bounded `POST /v1/media/video-sample` response now includes `shot_groups`
+and a `shot_index` on each sampled frame. A frame flagged as a histogram-change
+candidate begins a new provisional group. Each group includes sampled start/end
+indices and timestamps, sample count, and the boundary histogram distance.
+These are not confirmed semantic shots; flashes, camera movement, exposure
+changes or lighting changes can also trigger a candidate.
+
+The response also includes `consistency_status`. Exposure drift is unavailable
+until frames have validated linear RGB and a user-selected ROI. Neutral-region
+analysis likewise requires validated linear RGB. Mixed-camera comparison
+requires validated frames in one common working space and explicit colorimetric
+parameters. The current video sampler does not claim any of these prerequisites.
