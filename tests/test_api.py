@@ -1133,18 +1133,22 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
         purpose="graded_still_candidate",
     )
     monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", lambda _path: source)
-    monkeypatch.setattr(
-        "yrgb_engine.grading_pipeline.process_validated_still",
-        lambda *_args, **_kwargs: SimpleNamespace(graded_frame=graded),
-    )
-    monkeypatch.setattr(
-        "yrgb_engine.native_export.save_native_float_image",
-        lambda _frame, path: Path(path).write_bytes(b"float32-master-fixture") or Path(path),
-    )
+    seen = {}
+    def fake_pipeline(_frame, settings, **kwargs):
+        seen["settings"] = settings
+        seen["kwargs"] = kwargs
+        return SimpleNamespace(graded_frame=graded)
+
+    monkeypatch.setattr("yrgb_engine.grading_pipeline.process_validated_still", fake_pipeline)
+    def fake_writer(frame, path):
+        seen["export_frame"] = frame
+        Path(path).write_bytes(b"float32-master-fixture")
+        return Path(path)
+    monkeypatch.setattr("yrgb_engine.native_export.save_native_float_image", fake_writer)
     client = TestClient(create_app(registry=registry))
     response = client.post(
         "/v1/media/native-grade-export",
-        data={"profile_id": profile_id, "export_format": "exr"},
+        data={"profile_id": profile_id, "export_format": "exr", "exposure_stops": "1.25", "contrast": "1.1", "pivot": "0.2", "curve_midpoint": "0.6"},
         files={"file": ("still.tif", b"fake-image", "image/tiff")},
     )
     assert response.status_code == 200, response.text
@@ -1155,7 +1159,15 @@ def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, mo
     assert response.headers["x-yrgb-clamped"] == "false"
     assert response.headers["x-yrgb-frame-width"] == "2"
     assert response.headers["x-yrgb-frame-height"] == "1"
-    assert response.headers["x-yrgb-float-samples-sha256"]
+    from yrgb_engine.native_export import native_frame_sha256
+    assert seen["export_frame"] is graded
+    assert seen["settings"].exposure_stops == pytest.approx(1.25)
+    assert seen["settings"].contrast == pytest.approx(1.1)
+    assert seen["settings"].pivot == pytest.approx(0.2)
+    assert seen["settings"].master_curve == ((0.0, 0.0), (0.5, 0.6), (1.0, 1.0))
+    assert seen["kwargs"]["working_space_id"] == working_space
+    assert seen["kwargs"]["display_space_id"] == working_space
+    assert response.headers["x-yrgb-float-samples-sha256"] == native_frame_sha256(graded)
 
 
 def test_native_grade_export_blocks_unverified_camera_profile():
