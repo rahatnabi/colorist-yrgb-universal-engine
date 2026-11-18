@@ -64,6 +64,11 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             "X-YRGB-Frame-Height",
             "X-YRGB-Float-Samples-SHA256",
             "X-YRGB-Clamped",
+            "X-YRGB-Roundtrip-Verified",
+            "X-YRGB-Roundtrip-Max-Absolute-Error",
+            "X-YRGB-Roundtrip-RMSE",
+            "X-YRGB-Roundtrip-Sample-Count",
+            "X-YRGB-Roundtrip-SHA256-Matches",
         ],
     )
 
@@ -1427,6 +1432,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         from .look import LookSettings
         from .native_export import (
             NativeExportError, native_frame_sha256, save_native_float_image,
+            verify_native_float_export,
         )
         from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
 
@@ -1511,8 +1517,9 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 export_path = output.name
             try:
                 await run_in_threadpool(save_native_float_image, graded, export_path)
+                roundtrip = await run_in_threadpool(verify_native_float_export, graded, export_path)
             except NativeExportError as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
+                raise HTTPException(status_code=422, detail=f"Native export round-trip verification failed: {exc}") from exc
             response = FileResponse(
                 export_path,
                 media_type=media_type,
@@ -1527,6 +1534,11 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     "X-YRGB-Frame-Height": str(graded.height),
                     "X-YRGB-Float-Samples-SHA256": digest,
                     "X-YRGB-Clamped": "false",
+                    "X-YRGB-Roundtrip-Verified": str(bool(roundtrip["verified"])).lower(),
+                    "X-YRGB-Roundtrip-Max-Absolute-Error": str(roundtrip["max_absolute_error"]),
+                    "X-YRGB-Roundtrip-RMSE": str(roundtrip["rmse"]),
+                    "X-YRGB-Roundtrip-Sample-Count": str(roundtrip["sample_count"]),
+                    "X-YRGB-Roundtrip-SHA256-Matches": str(bool(roundtrip["sample_sha256_matches"])).lower(),
                 },
                 background=BackgroundTask(lambda cleanup_path=export_path: Path(cleanup_path).unlink(missing_ok=True)),
             )
