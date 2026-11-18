@@ -191,8 +191,16 @@ def _result_from_profile(profile: dict[str, object]) -> TransformValidationResul
         or result.transform_id != profile.get("transform_id")
         or result.source_space != profile.get("ocio_source_space")
         or result.destination_space != profile.get("ocio_destination_space")
+        or result.vector_count <= 0
+        or not isfinite(result.max_absolute_error)
+        or result.max_absolute_error < 0
+        or not isfinite(result.tolerance)
+        or result.tolerance <= 0
+        or result.max_absolute_error > result.tolerance
+        or len(result.config_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in result.config_sha256.casefold())
     ):
-        raise TransformValidationError("Camera profile and reference-validation evidence do not match.")
+        raise TransformValidationError("Camera profile and reference-validation evidence do not match or are invalid.")
     return result
 
 
