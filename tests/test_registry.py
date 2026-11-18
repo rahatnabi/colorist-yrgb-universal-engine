@@ -202,6 +202,8 @@ def test_verified_profile_with_passing_reference_record_is_usable():
             "config_sha256": "a" * 64,
             "reference_set_id": "vendor-chart-v1",
             "vector_count": 24,
+            "max_absolute_error": 0.00001,
+            "tolerance": 0.0001,
         },
     }])
     profile = registry.get_by_id("test.reference.validated")
