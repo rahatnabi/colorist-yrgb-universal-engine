@@ -52,7 +52,7 @@ For a hash + XML-only pass without ffprobe:
 python scripts/footage_intake.py /path/to/C1382M01.XML --skip-probe
 ```
 
-The report records each file independently. A video may report `probe_unavailable`, `probe_failed`, or `probe_timeout`; these are explicit states, not evidence that the file is corrupt. Preserve the original report and tool versions with the dataset.
+The report records each file independently and includes summary counts. XML sidecars larger than the configured 16 MiB safety limit are rejected before parsing. Unexpected probe exceptions are recorded as `probe_error` while preserving the already-computed checksum; missing optional probe dependencies are recorded as `probe_unavailable`. A video may also report `probe_failed` or `probe_timeout`; these are explicit states, not evidence that the file is corrupt. Preserve the original report and tool versions with the dataset.
 
 ## Intake pipeline
 
