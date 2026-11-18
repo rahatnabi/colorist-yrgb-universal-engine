@@ -635,6 +635,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
     async def media_transform_preview(
         file: UploadFile = File(...),
         profile_id: str = Form(..., min_length=1, max_length=160),
+        camera_model: str | None = Form(default=None, max_length=120),
     ) -> FileResponse:
         """Prepare a still through an approved camera transform and render a preview.
 
@@ -658,6 +659,15 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             raise HTTPException(
                 status_code=409,
                 detail="Selected camera profile is not reference-validated; automatic conversion is blocked.",
+            )
+        required_models = profile.get("camera_models", [])
+        if required_models and (
+            not camera_model
+            or not any(camera_model.casefold() == model.casefold() for model in required_models)
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Select an exact supported camera model for this profile before previewing.",
             )
         config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
         preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
@@ -777,6 +787,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
     async def media_video_transform_preview(
         file: UploadFile = File(...),
         profile_id: str = Form(..., min_length=1, max_length=160),
+        camera_model: str | None = Form(default=None, max_length=120),
         timestamp_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
     ) -> FileResponse:
         """Render one video frame through the same reference-gated preview path."""
@@ -796,6 +807,15 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             raise HTTPException(
                 status_code=409,
                 detail="Selected camera profile is not reference-validated; automatic conversion is blocked.",
+            )
+        required_models = profile.get("camera_models", [])
+        if required_models and (
+            not camera_model
+            or not any(camera_model.casefold() == model.casefold() for model in required_models)
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="Select an exact supported camera model for this profile before previewing.",
             )
         config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
         preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
