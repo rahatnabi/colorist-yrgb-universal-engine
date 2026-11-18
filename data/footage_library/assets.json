@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "asset_id": "sony-slog3cine-drive-intake-001",
+      "asset_kind": "camera_original",
+      "asset_state": "registered",
+      "provenance": {
+        "source_type": "user_supplied",
+        "source_reference": "https://drive.google.com/drive/folders/1tcR6qYRduc3hbKh5KsvMgBvutoXmZlBf?usp=drive_link",
+        "revision_or_capture_date": null,
+        "license_or_permission": null,
+        "rights_status": "unknown",
+        "attribution": null
+      },
+      "files": [
+        {"role": "video_original", "filename": "C1382.MP4", "acquisition_state": "pending", "byte_size": null, "sha256": null, "storage_uri": null},
+        {"role": "sidecar", "filename": "C1382M01.XML", "acquisition_state": "pending", "byte_size": null, "sha256": null, "storage_uri": null},
+        {"role": "video_original", "filename": "C1383.MP4", "acquisition_state": "pending", "byte_size": null, "sha256": null, "storage_uri": null},
+        {"role": "sidecar", "filename": "C1383M01.XML", "acquisition_state": "pending", "byte_size": null, "sha256": null, "storage_uri": null}
+      ],
+      "profile_claim": {
+        "transfer_function": "Sony S-Log3",
+        "gamut": "Sony S-Gamut3.Cine",
+        "claim_source": "user_asserted",
+        "verification_state": "unverified"
+      },
+      "capture_metadata": {
+        "camera_make": null,
+        "camera_model": null,
+        "recording_mode": null,
+        "firmware": null,
+        "codec": null,
+        "codec_profile": null,
+        "pixel_format": null,
+        "bit_depth": null,
+        "chroma_subsampling": null,
+        "width": null,
+        "height": null,
+        "frame_rate": null,
+        "range": null,
+        "transfer": null,
+        "primaries": null,
+        "matrix": null
+      },
+      "decoder_report": null,
+      "notes": [
+        "The profile is user-confirmed as an intake claim only; embedded metadata and XML must be checked.",
+        "Original bytes have not yet been acquired by this repository. Do not use this record as transform-validation evidence.",
+        "No redistribution permission has been established."
+      ]
+    }
+  ]
+}
