@@ -14,6 +14,7 @@ type AnalysisResponse = { width: number; height: number; decoder: string; timest
 type RoiMeasurement = { roi: { x: number; y: number; width: number; height: number; coordinate_space: string }; pixel_bounds: { left: number; top: number; right: number; bottom: number }; pixel_count: number; measurement_domain: string; channels: Record<string, { mean: number }> };
 type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
+type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
 type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 
 function formatBytes(bytes: number) {
@@ -64,6 +65,8 @@ export default function App() {
   const [sampleInterval, setSampleInterval] = useState("1");
   const [sampleCount, setSampleCount] = useState("8");
   const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
+  const [denseReport, setDenseReport] = useState<DenseTemporalReport | null>(null);
+  const [denseBusy, setDenseBusy] = useState(false);
   const [roiSelecting, setRoiSelecting] = useState(false);
   const [roiRect, setRoiRect] = useState({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
   const [previewAspect, setPreviewAspect] = useState("16 / 9");
@@ -117,7 +120,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
+    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -355,6 +358,31 @@ export default function App() {
                     </svg>
                     <div className="temporal-trend-legend">{(["R", "G", "B"] as const).map(channel => <span key={channel}>{channel} · {sampleReport.frames[0]?.roi_measurement.channels[channel]?.mean.toFixed(4) ?? "—"} → {sampleReport.frames.at(-1)?.roi_measurement.channels[channel]?.mean.toFixed(4) ?? "—"}</span>)}</div>
                     <div className="roi-measurement-meta"><span>{sampleReport.frames[0]?.roi_measurement.pixel_count.toLocaleString() ?? "—"} pixels / sampled frame</span><span>{sampleReport.frames[0]?.roi_measurement.measurement_domain || "unknown decoder domain"}</span><span>Vertical markers: provisional shot-group boundaries</span></div>
+                  </div>
+
+                  <div className="dense-analysis-panel">
+                    <div className="sample-control-heading"><b>Dense Flicker & Scene Diagnostics</b><span>25 FPS · FIXED ROI · 2×2 TILE CHECK</span></div>
+                    <button type="button" className="primary-button" disabled={denseBusy || busy || !apiOnline} onClick={async () => {
+                      if (!file) return;
+                      setDenseBusy(true); setDenseReport(null); setAnalysisNote("Running dense ROI spectral and spatial-coherence analysis…");
+                      try {
+                        const body = new FormData(); body.append("file", file);
+                        const params = new URLSearchParams({ start_seconds: frameTimestamp, interval_seconds: "0.04", frame_count: "96", minimum_samples: "48", roi_x: String(roiRect.x), roi_y: String(roiRect.y), roi_width: String(roiRect.width), roi_height: String(roiRect.height) });
+                        const response = await fetch(API_BASE + "/v1/media/video-roi-temporal-report?" + params.toString(), { method: "POST", body });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || "Dense ROI analysis failed");
+                        setDenseReport(data as DenseTemporalReport);
+                        setAnalysisNote("Dense ROI analysis complete. Periodic peaks and scene boundaries remain candidates, not confirmed diagnoses.");
+                      } catch (err) { setAnalysisNote(err instanceof Error ? err.message : "Dense ROI analysis failed"); }
+                      finally { setDenseBusy(false); }
+                    }}>{denseBusy ? "Analyzing dense ROI…" : "Run dense ROI diagnostics"}</button>
+                    {denseReport && <div className="dense-analysis-results">
+                      <div><b>Periodic signal</b><span>{denseReport.temporal_analysis.frequency_analysis.status.replace(/_/g, " ").toUpperCase()}</span><small>{denseReport.temporal_analysis.frequency_analysis.frequency_hz ? denseReport.temporal_analysis.frequency_analysis.frequency_hz.toFixed(2) + " Hz candidate" : "No supported peak estimate"}</small></div>
+                      <div><b>Spatial coherence</b><span>{denseReport.temporal_analysis.spatial_coherence.status.toUpperCase()}</span><small>{denseReport.temporal_analysis.spatial_coherence.coherent_tile_count ?? "—"} / {denseReport.temporal_analysis.spatial_coherence.tile_count ?? 4} tiles</small></div>
+                      <div><b>Scene boundaries</b><span>{denseReport.temporal_analysis.scene_boundary_candidates.length} candidates</span><small>RGB ROI mean-step flags only</small></div>
+                      <div><b>Exposure drift</b><span>{denseReport.temporal_analysis.exposure_drift_assessment.status.toUpperCase()}</span><small>Requires validated scene-linear RGB</small></div>
+                      <p>Spatial coherence is not motion compensation. Moving content, camera movement, rolling shutter and exposure control can mimic periodic variation.</p>
+                    </div>}
                   </div>
                   <div className="consistency-unavailable"><b>Consistency diagnostics</b><span>Exposure drift: unavailable until validated scene-linear RGB is available</span><span>Luminance trend: unavailable until matrix and transfer are validated</span><span>Mixed-camera match: requires common validated working space</span></div>
                   <p>{sampleReport.note}</p>
