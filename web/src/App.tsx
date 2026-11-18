@@ -562,6 +562,37 @@ export default function App() {
             </label>)}
           </div>
           <label className="look-slider look-master-curve"><span>MASTER CURVE MIDPOINT <b>{lookCurveMid.toFixed(2)}</b></span><input type="range" min="0.1" max="0.9" step="0.01" value={lookCurveMid} onChange={e => setLookCurveMid(Number(e.target.value))} /></label>
+          <section className="correction-accuracy-panel" aria-label="Correction Accuracy Report">
+            <div className="accuracy-report-heading">
+              <div><span className="section-kicker">LIVE GRADING DIAGNOSTICS</span><h3>Correction Accuracy Report</h3></div>
+              <div className="accuracy-overall-score"><span>OVERALL SCORE</span><strong>—<small> / 100</small></strong><b>NOT SCORED</b></div>
+            </div>
+            <div className="accuracy-report-grid">
+              <div className="accuracy-report-section">
+                <div className="accuracy-section-title"><b>01 · EXPOSURE</b><span>NOT SCORED</span></div>
+                <div className="accuracy-metric-main"><strong>—</strong><small>stops from target</small></div>
+                <div className="accuracy-metric-detail"><span>Measured</span><b>Unavailable</b></div>
+                <div className="accuracy-metric-detail"><span>Exercise target</span><b>0.00 stops · 18% gray</b></div>
+              </div>
+              <div className="accuracy-report-section">
+                <div className="accuracy-section-title"><b>02 · WHITE BALANCE</b><span>NOT SCORED</span></div>
+                <div className="accuracy-channel-values"><div><small>R</small><b>—</b></div><div><small>G</small><b>—</b></div><div><small>B</small><b>—</b></div></div>
+                <div className="accuracy-metric-detail"><span>Neutral ROI</span><b>Not measured</b></div>
+                <div className="accuracy-metric-detail"><span>Target</span><b>0 / 0 / 0</b></div>
+              </div>
+              <div className="accuracy-report-section">
+                <div className="accuracy-section-title"><b>03 · REFERENCE TONAL CURVE</b><span>NOT SCORED</span></div>
+                <div className="accuracy-percentile-list">{["P1","P10","P25","P50","P75","P90","P99"].map(anchor => <span key={anchor}><small>{anchor}</small><b>—</b></span>)}</div>
+                <div className="accuracy-metric-detail"><span>Reference anchors</span><b>Not configured</b></div>
+                <div className="accuracy-metric-detail"><span>Deviation</span><b>— stops</b></div>
+              </div>
+            </div>
+            <div className="accuracy-report-footer">
+              <div><b>WHY NO SCORE?</b><p>{lookLinearConfirmed ? "Your scene-linear confirmation enables the look-render workflow, but it does not validate the source transform. The current decoder still reports uncharacterized source pixels, so objective measurements are withheld." : "A score requires a validated linear-light image pipeline and an explicitly selected neutral reference region. The current upload decoder does not certify either."}</p></div>
+              <div className="accuracy-live-controls"><span>LIVE LOOK CONTROLS</span><b>EXP {lookSettings.exposure_stops >= 0 ? "+" : ""}{lookSettings.exposure_stops.toFixed(1)} ST</b><b>CON {lookSettings.contrast.toFixed(2)}×</b><b>SAT {lookSettings.saturation.toFixed(2)}×</b></div>
+            </div>
+            <div className="accuracy-report-note">The panel updates with the active grading controls. Dashes mean unavailable measurements—not zero error. Creative Look Similarity is a separate score and is not included here.</div>
+          </section>
           <div className="look-export-row">
             <span>Export resolution: <b>{lutSize} Point</b></span>
             <button type="button" className="primary-button" disabled={!apiOnline || lookBusy || !lookTitle.trim() || !lookSpace.trim()} onClick={async () => {
