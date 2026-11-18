@@ -22,8 +22,12 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vectorscopePoints }: { title: string; subtitle: string; icon: React.ReactNode; histograms?: Record<string, ScopeHistogram>; parades?: Record<string, ScopeRaster>; waveform?: ScopeRaster | null; vectorscopePoints?: [number, number][] | null }) {
+function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vectorscopePoints, kind }: { title: string; subtitle: string; icon: React.ReactNode; histograms?: Record<string, ScopeHistogram>; parades?: Record<string, ScopeRaster>; waveform?: ScopeRaster | null; vectorscopePoints?: [number, number][] | null; kind: "waveform" | "parade" | "histogram" | "vectorscope" }) {
   const channels = ["R", "G", "B"] as const;
+  const [channelMode, setChannelMode] = useState("RGB");
+  const [zoom, setZoom] = useState(1);
+  const [density, setDensity] = useState(70);
+  const visibleChannels = channelMode === "RGB" ? channels : channels.filter(channel => channel === channelMode);
   const hasParade = !!parades && channels.every(channel => !!parades[channel]);
   const hasHistogram = !!histograms && channels.every(channel => !!histograms[channel]);
   const hasWaveform = !!waveform;
@@ -33,14 +37,14 @@ function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vect
     <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
     <div className={"scope-screen" + (hasParade ? " rgb-parade-screen" : "")}><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
       {hasHistogram ? <svg className="rgb-histogram" viewBox="0 0 128 100" preserveAspectRatio="none" role="img" aria-label="RGB channel histogram">
-        {channels.map(channel => {
+        {visibleChannels.map(channel => {
           const counts = histograms[channel].counts;
           const peak = Math.max(1, ...counts);
           const points = counts.map((count, index) => (index / Math.max(1, counts.length - 1) * 128) + "," + (96 - count / peak * 88)).join(" ");
           return <polyline key={channel} className={"histogram-" + channel.toLowerCase()} points={points} />;
         })}
       </svg>
-      : hasParade ? <div className="rgb-parade-bands">{channels.map(channel => {
+      : hasParade ? <div className="rgb-parade-bands">{visibleChannels.map(channel => {
         const raster = parades[channel];
         return <div className={"parade-band parade-" + channel.toLowerCase()} key={channel}>
           <span className="parade-channel-label">{channel}</span>
@@ -52,11 +56,11 @@ function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vect
       : hasWaveform ? <svg className="scope-raster" viewBox={"0 0 " + waveform.width + " " + waveform.height} preserveAspectRatio="none" role="img" aria-label="Luma waveform raster">
           {waveform.counts.flatMap((column, x) => column.map((count, y) => count > 0 ? <rect key={x + "-" + y} x={x} y={y} width="1" height="1" opacity={Math.min(1, 0.16 + count / 8)} /> : null))}
         </svg>
-      : hasVectorscope ? <svg className="vectorscope-plot" viewBox="-0.55 -0.55 1.1 1.1" role="img" aria-label="Vectorscope chroma distribution">
+      : hasVectorscope ? <svg className="vectorscope-plot" viewBox="-0.55 -0.55 1.1 1.1" style={{ transform: "scale(" + zoom + ")" }} role="img" aria-label="Vectorscope chroma distribution">
           <circle cx="0" cy="0" r="0.5" className="vectorscope-boundary" />
           <circle cx="0" cy="0" r="0.25" className="vectorscope-ring" />
           <path d="M-0.5 0H0.5 M0 -0.5V0.5 M-0.3536 -0.3536L0.3536 0.3536 M-0.3536 0.3536L0.3536 -0.3536" className="vectorscope-axis" />
-          {vectorscopePoints.slice(0, 12000).map((point, index) => <circle key={index} cx={Math.max(-0.5, Math.min(0.5, point[0]))} cy={-Math.max(-0.5, Math.min(0.5, point[1]))} r="0.006" className="vectorscope-point" />)}
+          {vectorscopePoints.filter((_, index) => index % Math.max(1, Math.round(100 / density)) === 0).slice(0, 12000).map((point, index) => <circle key={index} cx={Math.max(-0.5, Math.min(0.5, point[0]))} cy={-Math.max(-0.5, Math.min(0.5, point[1]))} r="0.006" className="vectorscope-point" />)}
         </svg>
       : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
     </div>
@@ -73,6 +77,9 @@ export default function App() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
   const [scopeStandard, setScopeStandard] = useState<"bt709" | "bt2020">("bt709");
+  const [scopeFrozen, setScopeFrozen] = useState(false);
+  const [frozenAnalysis, setFrozenAnalysis] = useState<AnalysisResponse | null>(null);
+  const scopeDisplayAnalysis = useMemo(() => scopeFrozen && frozenAnalysis ? frozenAnalysis : analysis, [scopeFrozen, frozenAnalysis, analysis]);
   const [frameTimestamp, setFrameTimestamp] = useState("0");
   const [sampleInterval, setSampleInterval] = useState("1");
   const [sampleCount, setSampleCount] = useState("8");
@@ -132,7 +139,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
+    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setScopeFrozen(false); setFrozenAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -163,6 +170,7 @@ export default function App() {
 
   async function refreshScopes(standard: "bt709" | "bt2020") {
     if (!file || !apiOnline) return;
+    setScopeFrozen(false); setFrozenAnalysis(null);
     setBusy(true);
     setAnalysisNote("Recalculating scopes with " + standard.toUpperCase() + " coefficients…");
     try {
@@ -310,7 +318,7 @@ export default function App() {
                   setBusy(true); setAnalysis(null); setAnalysisNote("Decoding frame at " + frameTimestamp + " seconds…");
                   try {
                     const frameBody = new FormData(); frameBody.append("file", file);
-                    const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=" + encodeURIComponent(frameTimestamp), { method: "POST", body: frameBody });
+                    const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=" + encodeURIComponent(frameTimestamp) + "&scope_standard=" + scopeStandard, { method: "POST", body: frameBody });
                     const frameData = await frameResponse.json();
                     if (!frameResponse.ok) throw new Error(frameData.detail || "Video frame analysis failed");
                     setAnalysis(frameData as AnalysisResponse);
@@ -441,15 +449,15 @@ export default function App() {
           </section>
         </div>
 
-        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
+        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><button type="button" disabled={!analysis || busy} onClick={() => { if (analysis) { setFrozenAnalysis(analysis); setScopeFrozen(true); } }}>{scopeFrozen ? "FROZEN" : "FREEZE"}</button><button type="button" disabled={!file || busy || !apiOnline} onClick={() => void refreshScopes(scopeStandard)}>REFRESH</button><span className="subtle-tag">{scopeFrozen ? "FROZEN SNAPSHOT" : scopeDisplayAnalysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
-          <ScopePanel title="Luma Waveform" subtitle="Luma-weighted · manually selected coefficients · source sample values" icon={<Activity size={15} />} waveform={analysis?.analysis.waveform} />
-          <ScopePanel title="RGB Parade" subtitle="Separate R / G / B channel density · decoded source values" icon={<AudioWaveform size={15} />} parades={analysis?.analysis.rgb_parade} />
-          <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source sample range" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
-          <ScopePanel title="Vectorscope" subtitle="Cb / Cr chroma distribution · manually selected coefficients" icon={<Aperture size={15} />} vectorscopePoints={analysis?.analysis.vectorscope_points} />
+          <ScopePanel kind="waveform" title="Luma Waveform" subtitle="Luma-weighted · manually selected coefficients · source sample values" icon={<Activity size={15} />} waveform={scopeDisplayAnalysis?.analysis.waveform} />
+          <ScopePanel kind="parade" title="RGB Parade" subtitle="Separate R / G / B channel density · decoded source values" icon={<AudioWaveform size={15} />} parades={scopeDisplayAnalysis?.analysis.rgb_parade} />
+          <ScopePanel kind="histogram" title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source sample range" icon={<Gauge size={15} />} histograms={scopeDisplayAnalysis?.analysis.histograms} />
+          <ScopePanel kind="vectorscope" title="Vectorscope" subtitle="Cb / Cr chroma distribution · manually selected coefficients" icon={<Aperture size={15} />} vectorscopePoints={scopeDisplayAnalysis?.analysis.vectorscope_points} />
         </div>
-        {analysis?.analysis.scope_note && <div className="analysis-note scope-method-note">{analysis.analysis.scope_note}</div>}
+        {scopeDisplayAnalysis?.analysis.scope_note && <div className="analysis-note scope-method-note">{scopeDisplayAnalysis.analysis.scope_note}</div>}
         <section className="card look-development-card">
           <div className="card-heading"><div><span className="section-kicker">CREATIVE PROCESSING</span><h2>Look Development</h2></div><span className="subtle-tag">LINEAR RGB ENGINE</span></div>
           <p className="lut-export-description">Build a parametric look and bake it directly into a 3D .cube LUT. This first version operates in linear RGB; it does not decode camera Log or perform a Rec.709 display transform.</p>
