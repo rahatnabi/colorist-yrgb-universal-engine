@@ -11,7 +11,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Callable, Sequence
 
-from .ocio import ColorTransformError, transform_frame
+from .ocio import transform_frame
 from .precision import PrecisionFrame
 
 
