@@ -505,6 +505,23 @@ export default function App() {
             <div className="shot-compare-toolbar"><b>SHOT COMPARISON</b><span>Click a thumbnail to assign it to:</span><button type="button" className={compareTarget === "A" ? "active" : ""} onClick={() => setCompareTarget("A")}>IMAGE A</button><button type="button" className={compareTarget === "B" ? "active" : ""} onClick={() => setCompareTarget("B")}>IMAGE B</button></div>
             <div className="shot-compare-selects"><label>IMAGE A<select value={compareA} onChange={e => setCompareA(Number(e.target.value))}>{batchFiles.map((item,index)=><option key={index} value={index}>{index+1}. {item.name}</option>)}</select></label><label>IMAGE B<select value={compareB} onChange={e => setCompareB(Number(e.target.value))}>{batchFiles.map((item,index)=><option key={index} value={index}>{index+1}. {item.name}</option>)}</select></label></div>
             <div className="shot-compare-view">{[compareA,compareB].map((index,slot)=><div className="shot-compare-pane" key={slot}><div className="shot-compare-label">IMAGE {slot===0?"A":"B"} · {batchFiles[index]?.name}</div>{batchPreviewUrls[index] ? <img src={batchPreviewUrls[index]} alt={batchFiles[index]?.name} /> : <div className="contact-sheet-placeholder large">Preview not available in browser for this format</div>}</div>)}</div>
+            <div className="alignment-action-row">
+              <button type="button" className="primary-button" disabled={!apiOnline || alignmentBusy || batchFiles.length < 2 || compareA === compareB} onClick={async () => {
+                setAlignmentBusy(true); setAlignmentResult(null); setAlignmentNote("Aligning candidate image to reference…");
+                try { const body = new FormData(); body.append("reference", batchFiles[compareA]); body.append("candidate", batchFiles[compareB]);
+                  const response = await fetch(API_BASE + "/v1/media/align-compare", { method: "POST", body }); const data = await response.json();
+                  if (!response.ok) throw new Error(data.detail || "Image alignment failed"); setAlignmentResult(data as AlignmentComparison); setAlignmentNote("Alignment complete.");
+                } catch (err) { setAlignmentNote(err instanceof Error ? err.message : "Image alignment failed"); } finally { setAlignmentBusy(false); }
+              }}>{alignmentBusy ? "Aligning…" : "Align & Compare to Reference"}</button>
+              <span>Image A = reference · Image B = candidate</span>
+            </div>
+            {alignmentNote && <div className="lut-export-note">{alignmentNote}</div>}
+            {alignmentResult && <div className="alignment-results">
+              <b>ALIGNMENT · {alignmentResult.alignment.inliers} / {alignmentResult.alignment.good_matches} feature inliers</b>
+              <span>Overlap: {(alignmentResult.alignment.overlap_ratio * 100).toFixed(1)}% · Inlier ratio: {(alignmentResult.alignment.inlier_ratio * 100).toFixed(1)}%</span>
+              <div className="alignment-channel-grid">{(["R", "G", "B"] as const).map(channel => <div key={channel}><b>{channel}</b><small>MEAN Δ (B − A)</small><strong>{alignmentResult.comparison.channel_metrics[channel].mean_delta_candidate_minus_reference.toFixed(5)}</strong><small>MEAN ABS DIFFERENCE</small><span>{alignmentResult.comparison.channel_metrics[channel].mean_absolute_difference.toFixed(5)}</span></div>)}</div>
+              <p>{alignmentResult.comparison.note}</p>
+            </div>}
             {batchResult && compareA !== compareB && <div className="shot-compare-metrics"><b>DECODED SAMPLE MEAN DIFFERENCE · B − A</b>{(["R","G","B"] as const).map(channel=>{const a=batchResult.images[compareA]?.channels[channel]?.mean;const b=batchResult.images[compareB]?.channels[channel]?.mean;return <span key={channel}>{channel}: {a===undefined||b===undefined?"—":(b-a>=0?"+":"")+(b-a).toFixed(5)}</span>})}</div>}
           </div>}
           {batchResult && <div className="batch-results">
