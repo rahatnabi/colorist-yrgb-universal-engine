@@ -50,3 +50,8 @@ def test_cube_bake_has_expected_header_and_grid_entries():
     assert "LUT_3D_SIZE 17" in result
     assert result.count("\n") == 17**3 + 6
     assert "0.500000000" in result
+
+
+def test_look_preserves_linear_highlights_above_one_and_negative_values():
+    result = apply_look_rgb((0.75, -0.1, 0.25), LookSettings(exposure_stops=1))
+    assert result == pytest.approx((1.5, -0.2, 0.5))
