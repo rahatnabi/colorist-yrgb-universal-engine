@@ -5,13 +5,14 @@ claim that preview decodes or unverified camera profiles are grading-ready.
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 from dataclasses import asdict
 
-from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -368,6 +369,97 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             await file.close()
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
+
+    @app.post("/v1/media/look-linear-exr")
+    async def media_look_linear_exr(
+        file: UploadFile = File(...),
+        input_space_id: str = Form(..., min_length=1, max_length=120),
+        linear_input_confirmed: bool = Form(default=False),
+        settings_json: str = Form(default="{}"),
+    ) -> Response:
+        """Apply a creative look to an explicitly operator-declared linear still and export float EXR."""
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_input: str | None = None
+        temporary_output: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-look-in-", suffix=suffix, delete=False) as temp:
+                temporary_input = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds the 512 MiB limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded image is empty.")
+            if not linear_input_confirmed:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Confirm that the source pixels are scene-linear RGB in the selected working space.",
+                )
+            from .look import (
+                LookDevelopmentError,
+                LookSettings,
+                apply_look_to_declared_linear_frame,
+            )
+            from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+            from .linear_export import LinearExportError, save_linear_float_exr
+
+            try:
+                raw_settings = json.loads(settings_json)
+                if not isinstance(raw_settings, dict):
+                    raise ValueError("Look settings must be a JSON object.")
+                allowed = {
+                    "exposure_stops", "contrast", "pivot", "saturation",
+                    "temperature_shift", "tint_shift", "luminance_coefficients",
+                    "master_curve",
+                }
+                unknown = set(raw_settings) - allowed
+                if unknown:
+                    raise ValueError(f"Unknown look settings: {', '.join(sorted(unknown))}.")
+                if "luminance_coefficients" in raw_settings:
+                    raw_settings["luminance_coefficients"] = tuple(raw_settings["luminance_coefficients"])
+                if "master_curve" in raw_settings:
+                    raw_settings["master_curve"] = tuple(tuple(point) for point in raw_settings["master_curve"])
+                settings = LookSettings(**raw_settings)
+                frame = await run_in_threadpool(decode_oiio_float, temporary_input)
+                if frame.width * frame.height > 40_000_000:
+                    raise ValueError("Decoded image exceeds the 40-megapixel processing limit.")
+                graded = await run_in_threadpool(
+                    apply_look_to_declared_linear_frame,
+                    frame,
+                    settings,
+                    input_space_id=input_space_id,
+                    linear_input_confirmed=True,
+                )
+                with tempfile.NamedTemporaryFile(prefix="yrgb-look-out-", suffix=".exr", delete=False) as output:
+                    temporary_output = output.name
+                await run_in_threadpool(save_linear_float_exr, graded, temporary_output)
+                content = Path(temporary_output).read_bytes()
+                safe_name = "".join(
+                    char for char in Path(filename).stem if char.isalnum() or char in "-_ "
+                ).strip().replace(" ", "_") or "YRGB_Graded"
+                return Response(
+                    content=content,
+                    media_type="image/x-exr",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{safe_name}_graded_linear.exr"',
+                        "X-YRGB-Working-Space": input_space_id,
+                        "X-YRGB-Transform-Validated": "false",
+                        "X-YRGB-Output-Transfer": "scene-linear",
+                    },
+                )
+            except HTTPException:
+                raise
+            except (HighPrecisionDecodeError, LinearExportError, LookDevelopmentError, ValueError, TypeError, json.JSONDecodeError) as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_input:
+                Path(temporary_input).unlink(missing_ok=True)
+            if temporary_output:
+                Path(temporary_output).unlink(missing_ok=True)
 
     @app.post("/v1/look/export-cube")
     async def export_parametric_look(payload: dict[str, Any] = Body(...)) -> Response:
