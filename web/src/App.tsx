@@ -56,7 +56,7 @@ function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vect
           <circle cx="0" cy="0" r="0.5" className="vectorscope-boundary" />
           <circle cx="0" cy="0" r="0.25" className="vectorscope-ring" />
           <path d="M-0.5 0H0.5 M0 -0.5V0.5 M-0.3536 -0.3536L0.3536 0.3536 M-0.3536 0.3536L0.3536 -0.3536" className="vectorscope-axis" />
-          {vectorscopePoints.map((point, index) => <circle key={index} cx={Math.max(-0.5, Math.min(0.5, point[0]))} cy={-Math.max(-0.5, Math.min(0.5, point[1]))} r="0.006" className="vectorscope-point" />)}
+          {vectorscopePoints.slice(0, 12000).map((point, index) => <circle key={index} cx={Math.max(-0.5, Math.min(0.5, point[0]))} cy={-Math.max(-0.5, Math.min(0.5, point[1]))} r="0.006" className="vectorscope-point" />)}
         </svg>
       : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
     </div>
