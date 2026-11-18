@@ -5,6 +5,7 @@ const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
 type Probe = { detected_type?: string; status?: string; signature?: string; warnings?: string[]; metadata?: Record<string, unknown> };
 type ProbeResponse = { filename: string; size_bytes: number; probe: Probe };
+type CaptureMatch = { status: string; selection_made: false; camera_make?: string | null; camera_model?: string | null; encoding?: string | null; gamut?: string | null; candidates: Profile[]; note: string };
 type OcioStatus = { configured: boolean; status: string; config_name?: string; ocio_version?: string; color_space_count?: number; preview_space_available?: boolean; note: string };
 type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; validation_status?: string; transform_mapping_status?: string; resolution_note?: string; camera_models?: string[] };
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
@@ -70,6 +71,8 @@ export default function App() {
   const [cameraModel, setCameraModel] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileNote, setProfileNote] = useState("");
+  const [captureMatch, setCaptureMatch] = useState<CaptureMatch | null>(null);
+  const [captureMatchBusy, setCaptureMatchBusy] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [transformPreviewUrl, setTransformPreviewUrl] = useState("");
   const [transformPreviewNote, setTransformPreviewNote] = useState("");
@@ -109,7 +112,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
+    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -136,6 +139,32 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not reach the media API");
     } finally { setBusy(false); }
+  }
+
+  async function matchDetectedCapture() {
+    const capture = probe?.probe.metadata && typeof probe.probe.metadata === "object"
+      ? (probe.probe.metadata as Record<string, unknown>).capture_metadata
+      : undefined;
+    if (!capture || typeof capture !== "object" || Array.isArray(capture)) {
+      setProfileNote("No structured camera capture metadata is available for this file. Enter camera details manually.");
+      return;
+    }
+    setCaptureMatchBusy(true); setCaptureMatch(null); setProfileNote("Matching explicitly reported capture metadata…");
+    try {
+      const response = await fetch(`${API_BASE}/v1/profiles/match-capture`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(capture),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Capture matching failed");
+      const result = data as CaptureMatch;
+      setCaptureMatch(result); setProfiles(result.candidates || []);
+      if (result.camera_make) setManufacturer(result.camera_make);
+      if (result.camera_model) setCameraModel(result.camera_model);
+      if (result.encoding) setEncoding(result.encoding);
+      if (result.gamut) setGamut(result.gamut);
+      setProfileNote("Metadata match: " + result.status.replace(/_/g, " ") + ". No transform selected.");
+    } catch (err) { setProfileNote(err instanceof Error ? err.message : "Capture matching failed"); }
+    finally { setCaptureMatchBusy(false); }
   }
 
   async function findProfiles(event: React.FormEvent) {
@@ -271,6 +300,8 @@ export default function App() {
           <section className="card profile-card">
             <div className="card-heading"><div><span className="section-kicker">INPUT TRANSFORM RESEARCH</span><h2>Camera Profile</h2></div><ScanSearch size={18} className="muted-icon" /></div>
             {ocioStatus && <p className="profile-note">OCIO CONFIG · {ocioStatus.status.replace(/_/g, " ").toUpperCase()}{ocioStatus.config_name ? " · " + ocioStatus.config_name : ""}{ocioStatus.ocio_version ? " · OCIO " + ocioStatus.ocio_version : ""}{ocioStatus.note ? " — " + ocioStatus.note : ""}</p>}
+            <button type="button" className="secondary-button" disabled={!apiOnline || !probe || captureMatchBusy} onClick={() => void matchDetectedCapture()}>{captureMatchBusy ? "Matching metadata…" : "Match detected capture metadata"}</button>
+            {captureMatch && <div className="profile-note">MATCH STATUS · {captureMatch.status.replace(/_/g, " ").toUpperCase()}<br />{captureMatch.note}<br />Selection made: NO</div>}
             <form onSubmit={findProfiles} className="profile-form">
               <label>MANUFACTURER<input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="e.g. Sony" required /></label>
               <label>LOG / GAMMA ENCODING<input value={encoding} onChange={e => setEncoding(e.target.value)} placeholder="e.g. S-Log3" /></label>
