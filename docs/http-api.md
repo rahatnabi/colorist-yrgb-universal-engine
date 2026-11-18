@@ -31,3 +31,8 @@ create a proxy, or make a camera profile usable. Capability availability is not
 proof of complete format support. Production deployment still needs authentication,
 rate limiting, storage policy, request-size limits at the reverse proxy, and
 isolated media workers with CPU/time limits.
+
+
+## Browser development CORS
+
+The API allows `http://localhost:5173` by default for local Vite development. Set `YRGB_CORS_ORIGINS` to a comma-separated allowlist of exact trusted origins when deploying the API. Credentials are disabled. Do not use a wildcard origin in a production deployment.
