@@ -745,3 +745,78 @@ def test_invalid_scope_standard_is_rejected():
         files={"file": ("sample.tif", b"fake-image", "image/tiff")},
     )
     assert response.status_code == 422
+
+
+
+def test_reference_transform_validation_endpoint_returns_audit_without_promoting_profile(tmp_path, monkeypatch):
+    import json
+    from yrgb_engine.transform_validation import TransformValidationResult
+
+    config = tmp_path / "pinned.ocio"
+    config.write_text("pinned-config")
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    profile_id = "sony.slog3.sgamut3cine"
+    registry = ProfileRegistry([{
+        "id": profile_id,
+        "manufacturer": "Sony",
+        "encoding": "S-Log3",
+        "gamut": "S-Gamut3.Cine",
+        "camera_models": ["ILME-FX30"],
+        "status": "unverified",
+        "transform_id": "test.sony.transform",
+        "ocio_source_space": "Sony S-Log3",
+        "ocio_destination_space": "Linear Working",
+        "output_transfer": "Linear",
+        "output_primaries": "Test Wide Gamut",
+    }])
+
+    def fake_validate(manifest_path, *, config_path, registry, tolerance):
+        return TransformValidationResult(
+            profile_id=profile_id,
+            transform_id="test.sony.transform",
+            source_space="Sony S-Log3",
+            destination_space="Linear Working",
+            config_sha256="a" * 64,
+            reference_set_id="sony-measured-reference-v1",
+            vector_count=24,
+            max_absolute_error=0.000001,
+            tolerance=tolerance,
+            passed=True,
+            ocio_version="test",
+        )
+
+    monkeypatch.setattr("yrgb_engine.reference_data.validate_reference_manifest", fake_validate)
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/transforms/validate-reference",
+        files={"manifest_file": ("reference.json", json.dumps({"schema_version": 1}), "application/json")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["passed"] is True
+    assert payload["reference_set_id"] == "sony-measured-reference-v1"
+    assert payload["promotion_status"] == "not_promoted"
+    assert registry.get_by_id(profile_id)["usable_for_transform"] is False
+
+
+def test_reference_transform_validation_endpoint_requires_pinned_ocio_config(monkeypatch):
+    monkeypatch.delenv("YRGB_OCIO_CONFIG", raising=False)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/transforms/validate-reference",
+        files={"manifest_file": ("reference.json", b"{}", "application/json")},
+    )
+    assert response.status_code == 503
+    assert "pinned" in response.json()["detail"]
+
+
+def test_reference_transform_validation_endpoint_rejects_non_json_manifest(tmp_path, monkeypatch):
+    config = tmp_path / "pinned.ocio"
+    config.write_text("pinned-config")
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/transforms/validate-reference",
+        files={"manifest_file": ("reference.txt", b"{}", "text/plain")},
+    )
+    assert response.status_code == 415
