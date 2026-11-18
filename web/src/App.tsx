@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, FileImage, Gauge, LoaderCircle, ScanSearch, UploadCloud } from "lucide-react";
+import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, MonitorPlay, ScanSearch, UploadCloud } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
@@ -13,6 +13,9 @@ type ScopeRaster = { counts: number[][]; width: number; height: number; minimum:
 type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; waveform?: ScopeRaster | null; vectorscope_points?: [number, number][] | null; scope_standard?: "bt709" | "bt2020" | null; scope_note?: string; note: string } };
 type RoiMeasurement = { roi: { x: number; y: number; width: number; height: number; coordinate_space: string }; pixel_bounds: { left: number; top: number; right: number; bottom: number }; pixel_count: number; measurement_domain: string; channels: Record<string, { mean: number }> };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
+type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
+type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
+type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
 type BatchAnalysis = { image_count: number; images: { index: number; filename: string; width: number; height: number; sample_domain: string; channels: Record<string, { mean: number }> }[]; adjacent_comparisons: { from_index: number; to_index: number; channel_mean_delta: Record<string, number>; measurement_domain: string }[]; comparison_note: string };
 
@@ -86,6 +89,16 @@ export default function App() {
   const [analysisNote, setAnalysisNote] = useState("");
   const [scopeStandard, setScopeStandard] = useState<"bt709" | "bt2020">("bt709");
   const [scopeFrozen, setScopeFrozen] = useState(false);
+  const [frameTimestamp, setFrameTimestamp] = useState("0");
+  const [sampleInterval, setSampleInterval] = useState("1");
+  const [sampleCount, setSampleCount] = useState("8");
+  const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
+  const [denseReport, setDenseReport] = useState<DenseTemporalReport | null>(null);
+  const [denseBusy, setDenseBusy] = useState(false);
+  const [roiSelecting, setRoiSelecting] = useState(false);
+  const [roiRect, setRoiRect] = useState({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
+  const [previewAspect, setPreviewAspect] = useState("16 / 9");
+  const roiDragStart = useRef<{ x: number; y: number } | null>(null);
   const [frozenAnalysis, setFrozenAnalysis] = useState<AnalysisResponse | null>(null);
   const scopeDisplayAnalysis = useMemo(() => scopeFrozen && frozenAnalysis ? frozenAnalysis : analysis, [scopeFrozen, frozenAnalysis, analysis]);
   const [busy, setBusy] = useState(false);
@@ -133,11 +146,11 @@ export default function App() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const isVideo = useMemo(() => !!file && (file.type.startsWith("video/") || /\.(mov|mxf|mp4|mkv|avi)$/i.test(file.name)), [file]);
+  const isVideo = false;
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    if (!(selected.type.startsWith("image/") || /\\.(dng|tif|tiff|exr|dpx|png|jpe?g|bmp|webp|heic|heif)$/i.test(selected.name))) { setError("COLORIST YRGB is a still-image-only workspace. Please select an image file."); return; }
+    if (!(selected.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g|bmp|webp|heic|heif)$/i.test(selected.name))) { setError("COLORIST YRGB is a still-image-only workspace. Please select an image file."); return; }
     setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setScopeFrozen(false); setFrozenAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
