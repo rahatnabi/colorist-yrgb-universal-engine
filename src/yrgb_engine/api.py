@@ -42,7 +42,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
     profile_registry = registry or ProfileRegistry.load()
     allowed_origins = [
         origin.strip()
-        for origin in os.getenv("YRGB_CORS_ORIGINS", "http://localhost:5173").split(",")
+        for origin in os.getenv("YRGB_CORS_ORIGINS", "http://localhost:5173,tauri://localhost,http://tauri.localhost").split(",")
         if origin.strip()
     ]
     app.add_middleware(
