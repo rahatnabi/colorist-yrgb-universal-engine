@@ -121,3 +121,22 @@ def test_apply_marks_frame_validated_only_after_matching_reference_record(tmp_pa
     assert transformed.encoding.working_space_id == "DWG-Linear"
     assert transformed.encoding.transform_id == "camera-to-dwg"
     assert transformed.metadata["yrgb_transform_validation"]["reference_set_id"] == "vendor-patches-v1"
+
+
+def test_validation_result_exports_registry_audit_record(tmp_path):
+    config = tmp_path / "config.ocio"
+    config.write_text("ocio-config-fixture")
+    result = validate_reference_vectors(
+        transform_id="test.camera-to-working",
+        source_space="CameraLog",
+        destination_space="DWG-Linear",
+        config_path=config,
+        reference_set_id="independent-chart-v2",
+        vectors=_vectors(),
+        evaluate_rgb=lambda rgb: rgb,
+    )
+    record = result.to_registry_record()
+    assert record["passed"] is True
+    assert record["transform_id"] == "test.camera-to-working"
+    assert record["reference_set_id"] == "independent-chart-v2"
+    assert len(record["config_sha256"]) == 64
