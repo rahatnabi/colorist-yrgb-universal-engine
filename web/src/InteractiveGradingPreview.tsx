@@ -36,6 +36,15 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
   const [nativePreviewUrl, setNativePreviewUrl] = useState("");
   const [nativeStatus, setNativeStatus] = useState("Select a reference-validated camera profile to enable native rendering.");
   const [nativeBusy, setNativeBusy] = useState(false);
+  const [roi, setRoi] = useState({ x: 0, y: 0, width: 1, height: 1 });
+  const [measurementBusy, setMeasurementBusy] = useState(false);
+  const [measurementStatus, setMeasurementStatus] = useState("Choose a neutral reference region in the source still.");
+  const [measurementResult, setMeasurementResult] = useState<{
+    correction_accuracy: { status: string; score: number | null; exposure: { metrics: { measured: number | null; target: number | null; deviation: number | null; score: number | null }[] }; white_balance: { metrics: { name: string; measured: number | null; score: number | null }[] } };
+    scopes: { analysis: { channels: Record<string, { minimum: number; maximum: number; mean: number }>; waveform: unknown; vectorscope_points: unknown[] | null } };
+    frame: { width: number; height: number };
+    scope_axis: string;
+  } | null>(null);
 
   useEffect(() => () => {
     if (nativePreviewUrl) URL.revokeObjectURL(nativePreviewUrl);
@@ -43,6 +52,8 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
 
   useEffect(() => {
     setNativePreviewUrl("");
+    setMeasurementResult(null);
+    setMeasurementStatus("Grade controls or source changed · run native measurements again.");
     setNativeStatus(profileId
       ? "Grade controls changed · render again to refresh the native result."
       : "Select a reference-validated camera profile to enable native rendering.");
@@ -195,6 +206,44 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     }
   }
 
+
+  async function runNativeMeasurements() {
+    if (!sourceFile || !profileId) return;
+    if (roi.width < 1 || roi.height < 1 || roi.x < 0 || roi.y < 0) {
+      setMeasurementStatus("ROI coordinates and dimensions must be positive.");
+      return;
+    }
+    setMeasurementBusy(true);
+    setMeasurementResult(null);
+    setMeasurementStatus("Measuring scopes and correction accuracy from the native graded float32 image…");
+    try {
+      const body = new FormData();
+      body.append("file", sourceFile);
+      body.append("profile_id", profileId);
+      if (cameraModel) body.append("camera_model", cameraModel);
+      body.append("roi_x", String(roi.x));
+      body.append("roi_y", String(roi.y));
+      body.append("roi_width", String(roi.width));
+      body.append("roi_height", String(roi.height));
+      body.append("exposure_stops", String(settings.exposure_stops));
+      body.append("contrast", String(settings.contrast));
+      body.append("pivot", String(settings.pivot));
+      body.append("saturation", String(settings.saturation));
+      body.append("temperature_shift", String(settings.temperature_shift));
+      body.append("tint_shift", String(settings.tint_shift));
+      body.append("curve_midpoint", String(curveMidpoint));
+      const response = await fetch(apiBase + "/v1/media/native-measurements", { method: "POST", body });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "Native measurements failed.");
+      setMeasurementResult(payload);
+      setMeasurementStatus("Measurements calculated from the same validated native graded float32 frame.");
+    } catch (error) {
+      setMeasurementStatus(error instanceof Error ? error.message : "Native measurements failed.");
+    } finally {
+      setMeasurementBusy(false);
+    }
+  }
+
   function exportPreview() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -224,6 +273,33 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
         {nativeBusy ? "RENDERING NATIVE…" : "RENDER THROUGH NATIVE ENGINE"}
       </button>
       <span>{nativeStatus}</span>
+    </div>
+
+    <div className="native-measurements-panel">
+      <div className="native-measurements-heading"><b>NATIVE SCOPE & CORRECTION MEASUREMENTS</b><span>VALIDATED LINEAR FRAME</span></div>
+      <p>Choose a neutral reference ROI in the original still. Coordinates are full-resolution source pixels, not the resized browser preview.</p>
+      <div className="native-roi-grid">
+        {(["x", "y", "width", "height"] as const).map(key => <label key={key}>{key.toUpperCase()}<input type="number" min={key === "width" || key === "height" ? 1 : 0} step="1" value={roi[key]} onChange={event => setRoi(current => ({ ...current, [key]: Math.max(0, Math.floor(Number(event.target.value) || 0)) }))} /></label>)}
+      </div>
+      <button type="button" className="preview-export-button" disabled={!sourceFile || !profileId || measurementBusy} onClick={runNativeMeasurements}>
+        {measurementBusy ? "MEASURING NATIVE FRAME…" : "MEASURE NATIVE GRADE"}
+      </button>
+      <span className="native-measurement-status">{measurementStatus}</span>
+      {measurementResult && <>
+        <div className="native-measurement-score">
+          <div><small>CORRECTION ACCURACY</small><b>{measurementResult.correction_accuracy.score === null ? "NOT SCORED" : measurementResult.correction_accuracy.score.toFixed(1) + "%"}</b></div>
+          <div><small>EXPOSURE DEVIATION</small><b>{measurementResult.correction_accuracy.exposure.metrics[0]?.deviation === null ? "—" : measurementResult.correction_accuracy.exposure.metrics[0]?.deviation.toFixed(3) + " stops"}</b></div>
+        </div>
+        <div className="native-measurement-wb">
+          {measurementResult.correction_accuracy.white_balance.metrics.map(metric => <div key={metric.name}><small>{metric.name.toUpperCase()}</small><b>{metric.measured === null ? "—" : metric.measured.toFixed(4)}</b></div>)}
+        </div>
+        <div className="native-scope-summary">
+          <b>NATIVE SCOPE SIGNAL</b>
+          <span>{measurementResult.frame.width} × {measurementResult.frame.height} · {measurementResult.scope_axis}</span>
+          <div>{Object.entries(measurementResult.scopes.analysis.channels).map(([channel, stats]) => <span key={channel}>{channel}: mean {stats.mean.toFixed(4)} · min {stats.minimum.toFixed(4)} · max {stats.maximum.toFixed(4)}</span>)}</div>
+          <span>Waveform: {measurementResult.scopes.analysis.waveform ? "available" : "unavailable"} · Vectorscope samples: {measurementResult.scopes.analysis.vectorscope_points?.length ?? 0}</span>
+        </div>
+      </>}
     </div>
     {nativePreviewUrl && <div className="native-grading-result">
       <b>NATIVE PIPELINE OUTPUT · DISPLAY PREVIEW</b>
