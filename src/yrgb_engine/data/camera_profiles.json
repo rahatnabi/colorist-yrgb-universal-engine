@@ -12,7 +12,12 @@
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Candidate profile. Confirm exact camera model and recording mode."
+      "notes": "Candidate profile. Confirm exact camera model and recording mode. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "S-Log3 S-Gamut3.Cine",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "sony.slog3.sgamut3",
@@ -23,7 +28,12 @@
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Do not substitute for S-Gamut3.Cine."
+      "notes": "Do not substitute for S-Gamut3.Cine. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "S-Log3 S-Gamut3",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "arri.logc3.awg3",
@@ -34,7 +44,12 @@
       "generation": "LogC3/AWG3",
       "transform_id": null,
       "status": "unverified",
-      "notes": "EI and camera-generation requirements must be represented before verification."
+      "notes": "EI and camera-generation requirements must be represented before verification. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "ARRI LogC3 (EI800)",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "arri.logc4.awg4",
@@ -45,7 +60,12 @@
       "generation": "LogC4/AWG4",
       "transform_id": null,
       "status": "unverified",
-      "notes": "Keep separate from LogC3/AWG3."
+      "notes": "Keep separate from LogC3/AWG3. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "ARRI LogC4",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "canon.clog3.cinema_gamut",
@@ -56,7 +76,12 @@
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Camera and firmware compatibility requires validation."
+      "notes": "Camera and firmware compatibility requires validation. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "CanonLog3 CinemaGamut D55",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "red.log3g10.redwidegamutrgb",
@@ -67,7 +92,12 @@
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "RED metadata and decode pipeline may affect required settings."
+      "notes": "RED metadata and decode pipeline may affect required settings. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "Log3G10 REDWideGamutRGB",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "blackmagic.film_gen5.bmd_wide_gamut",
@@ -83,7 +113,12 @@
       "generation": "Gen 5",
       "transform_id": null,
       "status": "unverified",
-      "notes": "Pocket Cinema Camera 4K/6K family candidate for Gen 5 decode. Confirm clip metadata and RAW decode settings; not transform-validated."
+      "notes": "Pocket Cinema Camera 4K/6K family candidate for Gen 5 decode. Confirm clip metadata and RAW decode settings; not transform-validated. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "BMDFilm WideGamut Gen5",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "panasonic.vlog.vgamut",
@@ -94,7 +129,12 @@
       "generation": null,
       "transform_id": null,
       "status": "unverified",
-      "notes": "Camera model and recording mode require validation."
+      "notes": "Camera model and recording mode require validation. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "V-Log V-Gamut",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "fujifilm.flog2.fgamut",
@@ -149,7 +189,12 @@
       "generation": "Apple Log",
       "transform_id": null,
       "status": "unverified",
-      "notes": "Apple Log uses BT.2020 primaries and an Apple-defined Log transfer function. Recording support starts with iPhone 15 Pro; preserve the exact transfer-function metadata. Not transform-validated."
+      "notes": "Apple Log uses BT.2020 primaries and an Apple-defined Log transfer function. Recording support starts with iPhone 15 Pro; preserve the exact transfer-function metadata. Not transform-validated. Candidate OCIO color-space mapping from the upstream ACES config; still unverified pending independent reference-vector validation.",
+      "ocio_source_space": "Apple Log",
+      "ocio_destination_space": "DaVinci Intermediate WideGamut",
+      "output_transfer": "DaVinci Intermediate",
+      "output_primaries": "DaVinci Wide Gamut",
+      "ocio_config_reference": "OpenColorIO-Config-ACES v4.0.0 / ACES 2.0 / OCIO 2.5"
     },
     {
       "id": "blackmagic.film_gen4.pocket_4k_6k",
