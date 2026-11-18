@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+import pytest
+
 from yrgb_engine.api import create_app
 from yrgb_engine.registry import ProfileRegistry
 
@@ -216,3 +218,50 @@ def test_lut_export_endpoint_rejects_unsupported_grid_size():
         files={"file": ("look.cube", b"LUT_3D_SIZE 2", "text/plain")},
     )
     assert response.status_code == 422
+
+
+def test_linear_look_exr_endpoint_applies_controls_and_returns_float_exr(monkeypatch):
+    from pathlib import Path
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6), source_path="fixture.exr", decoder="mock",
+        encoding=ColorEncoding(transfer="unknown"),
+    )
+
+    def fake_decode(_path):
+        return frame
+
+    def fake_save(graded, output_path):
+        assert graded.pixel(0, 0) == pytest.approx((0.4, 0.8, 1.2))
+        Path(output_path).write_bytes(b"mock-openexr-float-data")
+        return Path(output_path)
+
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", fake_decode)
+    monkeypatch.setattr("yrgb_engine.linear_export.save_linear_float_exr", fake_save)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/look-linear-exr",
+        data={
+            "input_space_id": "scene-linear-rec709",
+            "linear_input_confirmed": "true",
+            "settings_json": '{"exposure_stops": 1.0}',
+        },
+        files={"file": ("plate.exr", b"source-image", "image/x-exr")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.content == b"mock-openexr-float-data"
+    assert response.headers["x-yrgb-transform-validated"] == "false"
+    assert response.headers["x-yrgb-output-transfer"] == "scene-linear"
+
+
+def test_linear_look_exr_endpoint_requires_linear_confirmation(monkeypatch):
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/look-linear-exr",
+        data={"input_space_id": "scene-linear-rec709"},
+        files={"file": ("plate.exr", b"source-image", "image/x-exr")},
+    )
+    assert response.status_code == 422
+    assert "Confirm" in response.json()["detail"]
