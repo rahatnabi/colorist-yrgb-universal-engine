@@ -8,7 +8,7 @@ type ProbeResponse = { filename: string; size_bytes: number; probe: Probe };
 type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; camera_models?: string[] };
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
-type AnalysisResponse = { width: number; height: number; decoder: string; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
+type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -36,6 +36,7 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
+  const [frameTimestamp, setFrameTimestamp] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
@@ -77,8 +78,13 @@ export default function App() {
         const analysisData = await analysisResponse.json();
         if (!analysisResponse.ok) setAnalysisNote(analysisData.detail || "Precision decoder unavailable. Install the OpenImageIO extra.");
         else { setAnalysis(analysisData as AnalysisResponse); setAnalysisNote("Decoded by engine. Values are source sample-domain measurements; no input transform or IRE scale is assumed."); }
-      } else if (selected.type.startsWith("video/")) {
-        setAnalysisNote("Video frame sampling is the next integration step; no video scopes are fabricated.");
+      } else if (selected.type.startsWith("video/") || /\.(mov|mxf|mp4|mkv|avi)$/i.test(selected.name)) {
+        setAnalysisNote("Decoding video frame at 0.0 seconds…");
+        const frameBody = new FormData(); frameBody.append("file", selected);
+        const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=0", { method: "POST", body: frameBody });
+        const frameData = await frameResponse.json();
+        if (!frameResponse.ok) setAnalysisNote(frameData.detail || "Video frame decoder unavailable. Install FFmpeg and NumPy.");
+        else { setAnalysis(frameData as AnalysisResponse); setAnalysisNote("Frame decoded at 0.0s by FFmpeg. Source sample-domain measurements only; no camera transform or IRE scale is assumed."); }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not reach the media API");
@@ -137,6 +143,21 @@ export default function App() {
               </div>
               {probe && <div className="probe-details"><div><small>DETECTED TYPE</small><b>{probe.probe.detected_type || "Unknown"}</b></div><div><small>FILE SIGNATURE</small><b>{probe.probe.signature || "Unknown"}</b></div><div><small>PROBE STATUS</small><b>{probe.probe.status || "Unknown"}</b></div></div>}
               {probe?.probe.warnings?.length ? <div className="warning-line">{probe.probe.warnings.join(" · ")}</div> : null}
+              {isVideo && <div className="video-frame-control">
+                <label>FRAME TIME (SECONDS)<input type="number" min="0" max="86400" step="0.1" value={frameTimestamp} onChange={e => setFrameTimestamp(e.target.value)} /></label>
+                <button type="button" disabled={busy || !apiOnline || !Number.isFinite(Number(frameTimestamp)) || Number(frameTimestamp) < 0} onClick={async () => {
+                  setBusy(true); setAnalysis(null); setAnalysisNote("Decoding frame at " + frameTimestamp + " seconds…");
+                  try {
+                    const frameBody = new FormData(); frameBody.append("file", file);
+                    const frameResponse = await fetch(API_BASE + "/v1/media/video-frame?timestamp_seconds=" + encodeURIComponent(frameTimestamp), { method: "POST", body: frameBody });
+                    const frameData = await frameResponse.json();
+                    if (!frameResponse.ok) throw new Error(frameData.detail || "Video frame analysis failed");
+                    setAnalysis(frameData as AnalysisResponse);
+                    setAnalysisNote("Frame decoded at " + frameTimestamp + "s. Source sample-domain values; no camera transform or IRE scale is assumed.");
+                  } catch (err) { setAnalysisNote(err instanceof Error ? err.message : "Video frame analysis failed"); }
+                  finally { setBusy(false); }
+                }}>Analyze frame</button>
+              </div>}
             </div>}
             <div className="format-row"><span>SUPPORTED BY DECODER DEPENDENCIES</span><b>JPEG</b><b>PNG</b><b>TIFF</b><b>EXR</b><b>RAW*</b><b>PRORES*</b><small>* Optional decoder / codec support</small></div>
           </section>
