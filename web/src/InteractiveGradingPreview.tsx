@@ -18,9 +18,10 @@ type Props = {
   settings: InteractiveLookSettings;
   curveMidpoint: number;
   onRender?: (result: InteractivePreviewAnalysis) => void;
+  onReset?: () => void;
 };
 
-export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, onRender }: Props) {
+export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, onRender, onReset }: Props) {
   const onRenderRef = useRef(onRender);
   onRenderRef.current = onRender;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -157,7 +158,7 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
   return <section className="interactive-grading-preview" aria-label="Interactive still image grading preview">
     <div className="grading-preview-heading">
       <div><b>LIVE IMAGE PREVIEW</b><span>{dimensions ? dimensions.width + " × " + dimensions.height + " · PREVIEW" : "NO IMAGE"}</span></div>
-      <button type="button" className="preview-export-button" disabled={!dimensions} onClick={exportPreview}>EXPORT GRADED PNG</button>
+      <div className="grading-preview-actions"><button type="button" className="preview-reset-button" onClick={() => onReset?.()}>RESET GRADE</button><button type="button" className="preview-export-button" disabled={!dimensions} onClick={exportPreview}>EXPORT GRADED PNG</button></div>
     </div>
     <div className="grading-preview-screen">
       {sourceUrl ? <canvas ref={canvasRef} aria-label="Interactive graded image preview" /> : <span>Upload a still image to see grading changes.</span>}
