@@ -9,6 +9,8 @@ type Profile = { id: string; manufacturer: string; encoding: string; gamut?: str
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
 type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
+type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }> };
+type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; frames: VideoSampleFrame[]; note: string };
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -53,7 +55,7 @@ export default function App() {
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
-  const [frameTimestamp, setFrameTimestamp] = useState("0");
+  const [frameTimestamp, setFrameTimestamp] = useState("0");\n  const [sampleInterval, setSampleInterval] = useState("1");\n  const [sampleCount, setSampleCount] = useState("8");\n  const [sampleReport, setSampleReport] = useState<VideoSampleReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
@@ -79,7 +81,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setAnalysis(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setBusy(true);
+    setFile(selected); setProbe(null); setAnalysis(null); setSampleReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -175,6 +177,36 @@ export default function App() {
                   } catch (err) { setAnalysisNote(err instanceof Error ? err.message : "Video frame analysis failed"); }
                   finally { setBusy(false); }
                 }}>Analyze frame</button>
+              </div>}
+              {isVideo && <div className="video-sample-control">
+                <div className="sample-control-heading"><b>Temporal Sample Analysis</b><span>BOUNDED FRAME SCAN</span></div>
+                <div className="sample-control-fields">
+                  <label>INTERVAL (SEC)<input type="number" min="0.1" max="60" step="0.1" value={sampleInterval} onChange={e => setSampleInterval(e.target.value)} /></label>
+                  <label>FRAME COUNT (1–24)<input type="number" min="1" max="24" step="1" value={sampleCount} onChange={e => setSampleCount(e.target.value)} /></label>
+                  <button type="button" disabled={busy || !apiOnline || !Number.isFinite(Number(sampleInterval)) || Number(sampleInterval) <= 0 || !Number.isInteger(Number(sampleCount)) || Number(sampleCount) < 1 || Number(sampleCount) > 24} onClick={async () => {
+                    if (!file) return;
+                    setBusy(true); setSampleReport(null); setAnalysisNote("Sampling video frames and comparing adjacent histograms…");
+                    try {
+                      const body = new FormData(); body.append("file", file);
+                      const params = new URLSearchParams({ start_seconds: frameTimestamp, interval_seconds: sampleInterval, frame_count: sampleCount, shot_change_threshold: "0.35" });
+                      const response = await fetch(API_BASE + "/v1/media/video-sample?" + params.toString(), { method: "POST", body });
+                      const data = await response.json();
+                      if (!response.ok) throw new Error(data.detail || "Video sample analysis failed");
+                      setSampleReport(data as VideoSampleReport);
+                      setAnalysisNote("Temporal sample complete. Shot flags are histogram-change candidates, not confirmed scene cuts.");
+                    } catch (err) { setAnalysisNote(err instanceof Error ? err.message : "Video sample analysis failed"); }
+                    finally { setBusy(false); }
+                  }}>Analyze sequence</button>
+                </div>
+                {sampleReport && <div className="sample-report">
+                  <div className="sample-report-summary"><b>{sampleReport.frame_count} frames analyzed</b><span>{sampleReport.frames.filter(frame => frame.shot_change_candidate).length} change candidates</span></div>
+                  <div className="sample-frame-list">{sampleReport.frames.map(frame => <div className="sample-frame-row" key={frame.frame_index}>
+                    <span>#{String(frame.frame_index + 1).padStart(2, "0")} · {frame.timestamp_seconds.toFixed(2)}s</span>
+                    <span>Δ histogram {frame.histogram_distance === null ? "—" : frame.histogram_distance.toFixed(3)}</span>
+                    {frame.shot_change_candidate ? <b className="candidate-flag">CHANGE CANDIDATE</b> : <small>—</small>}
+                  </div>)}</div>
+                  <p>{sampleReport.note}</p>
+                </div>}
               </div>}
             </div>}
             <div className="format-row"><span>SUPPORTED BY DECODER DEPENDENCIES</span><b>JPEG</b><b>PNG</b><b>TIFF</b><b>EXR</b><b>RAW*</b><b>PRORES*</b><small>* Optional decoder / codec support</small></div>
