@@ -78,6 +78,9 @@ export default function App() {
   const [lookSettings, setLookSettings] = useState({ exposure_stops: 0, contrast: 1, pivot: 0.18, saturation: 1, temperature_shift: 0, tint_shift: 0 });
   const [lookNote, setLookNote] = useState("");
   const [lookBusy, setLookBusy] = useState(false);
+  const [lookLinearConfirmed, setLookLinearConfirmed] = useState(false);
+  const [lookRenderBusy, setLookRenderBusy] = useState(false);
+  const [lookRenderNote, setLookRenderNote] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -294,6 +297,24 @@ export default function App() {
               finally { setLookBusy(false); }
             }}>{lookBusy ? "Baking LUT…" : "Generate Look LUT"}</button>
           </div>
+          {isImage && file && <div className="linear-render-panel">
+            <label className="linear-confirm"><input type="checkbox" checked={lookLinearConfirmed} onChange={e => setLookLinearConfirmed(e.target.checked)} /><span>I confirm this image contains scene-linear RGB pixels in the selected working space. It is not camera Log, Rec.709, or an unverified display-referred image.</span></label>
+            <button type="button" className="primary-button" disabled={!apiOnline || !lookLinearConfirmed || lookRenderBusy} onClick={async () => {
+              setLookRenderBusy(true); setLookRenderNote("Applying look and writing unclipped float EXR…");
+              try {
+                const body = new FormData(); body.append("file", file);
+                body.append("input_space_id", lookSpace); body.append("linear_input_confirmed", "true");
+                body.append("settings_json", JSON.stringify({ ...lookSettings, luminance_coefficients: lookLuma, master_curve: [[0, 0], [0.5, lookCurveMid], [1, 1]] }));
+                const response = await fetch(API_BASE + "/v1/media/look-linear-exr", { method: "POST", body });
+                if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Linear EXR render failed"); }
+                const blob = await response.blob(); const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name.replace(/\.[^.]+$/, "") + "_graded_linear.exr"; anchor.click(); URL.revokeObjectURL(url);
+                setLookRenderNote("Float EXR exported. Values remain scene-linear and unclipped; transform validation is not claimed. Apply a validated display transform for viewing/delivery.");
+              } catch (err) { setLookRenderNote(err instanceof Error ? err.message : "Linear EXR render failed"); }
+              finally { setLookRenderBusy(false); }
+            }}>{lookRenderBusy ? "Rendering…" : "Apply Look & Export Float EXR"}</button>
+            {lookRenderNote && <div className="lut-export-note">{lookRenderNote}</div>}
+          </div>}
           {lookNote && <div className="lut-export-note">{lookNote}</div>}
           <div className="look-warning">Temperature and Tint are artistic RGB gain offsets, not Kelvin-based white-balance controls. Master curve support exists in the engine API; an interactive curve editor is a subsequent UI task.</div>
         </section>
