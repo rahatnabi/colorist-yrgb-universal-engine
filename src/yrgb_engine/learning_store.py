@@ -18,6 +18,20 @@ def _root() -> Path:
     return root
 
 
+@contextmanager
+def _database():
+    """Yield a configured SQLite connection and always close it."""
+    connection = _connect()
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def _connect() -> sqlite3.Connection:
     connection = sqlite3.connect(_root() / "learning.sqlite3")
     connection.row_factory = sqlite3.Row
