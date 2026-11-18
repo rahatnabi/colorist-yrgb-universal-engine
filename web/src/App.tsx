@@ -6,6 +6,9 @@ const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 type Probe = { detected_type?: string; status?: string; signature?: string; warnings?: string[]; metadata?: Record<string, unknown> };
 type ProbeResponse = { filename: string; size_bytes: number; probe: Probe };
 type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; camera_models?: string[] };
+type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
+type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
+type AnalysisResponse = { width: number; height: number; decoder: string; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -50,7 +53,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setError(""); setBusy(true);
+    setFile(selected); setProbe(null); setAnalysis(null); setAnalysisNote(""); setError(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
