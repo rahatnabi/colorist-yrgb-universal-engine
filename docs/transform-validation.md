@@ -85,3 +85,29 @@ The registry now records candidate OCIO color-space names aligned with the Acade
 The candidate destination is DaVinci Intermediate WideGamut, with declared DaVinci Intermediate transfer and DaVinci Wide Gamut primaries. These names are intended for an explicitly pinned, compatible upstream OCIO config; the engine does not silently download or substitute a config. The ACES config is an upstream transform implementation, not by itself independent camera reference measurements. Therefore every mapped profile still reports mapped_unvalidated and remains blocked from automatic conversion until its exact config hash and independent reference-vector set pass.
 
 Profiles not represented by this upstream mapping (including the current Insta360 I-Log variants, Nikon N-Log, RED Log3G12, and Blackmagic Gen 4) remain mapping-unavailable until an exact, documented transform source is identified.
+
+
+## Sony S-Log3 / S-Gamut3.Cine reference-validation workflow
+
+A machine-readable manifest template is provided at `data/reference_vectors/sony_slog3_sgamut3cine.template.json`. It is intentionally empty: no measured camera/reference values are fabricated or supplied as production evidence.
+
+1. Confirm the exact Sony camera model, recording mode, codec, bit depth, and S-Gamut3.Cine metadata for the source material.
+2. Obtain independently measured reference values with a documented source, chart/patch identity, capture conditions, and measurement method. Values must be expressed in the manifest's exact source and destination OCIO spaces.
+3. Copy the template, fill `reference_source`, `measurement_method`, and the measured `vectors` array. Do not use identity vectors or guessed values.
+4. Install the OCIO 2.5-compatible Studio config from the official ACES v4.0.0 release and keep that exact config file unchanged for the run.
+5. Run:
+
+```bash
+python -m pip install -e ".[ocio]"
+yrgb-validate-transform \
+  --manifest data/reference_vectors/sony_slog3_sgamut3cine.json \
+  --config /absolute/path/to/studio-config-v4.0.0_aces-v2.0_ocio-v2.5.ocio \
+  --tolerance 0.00001 \
+  --output sony-slog3-reference-validation.json
+```
+
+The command checks that manifest profile/transform/space names exactly match the registry, evaluates every vector through the pinned OCIO processor, records the config SHA-256 and OCIO version, and writes an audit record. Exit code `0` means the numeric comparison passed; exit code `2` means validation failed or required evidence is missing.
+
+A passing report is a candidate audit artifact, not automatic approval. A reviewer must inspect the reference provenance, capture metadata, vector coverage, tolerance, and transform behavior before adding the report to the profile's `validation` record and changing its status to `verified`. The tool never edits the registry or enables a camera transform automatically.
+
+The official ACES v4.0.0 release identifies the Studio config as an OCIO 2.5 config and lists the Sony S-Log3 / S-Gamut3.Cine and DaVinci Intermediate WideGamut spaces. It also notes DJI D-Log / D-Gamut transform support. Space-name availability is a compatibility check, not independent camera validation. See the [official ACES config release](https://github.com/AcademySoftwareFoundation/OpenColorIO-Config-ACES/releases/tag/v4.0.0).
