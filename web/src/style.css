@@ -151,3 +151,42 @@
 .alignment-overlay-preview{display:grid;gap:6px;margin:4px 0 2px}
 .alignment-overlay-preview img{display:block;width:100%;max-height:420px;object-fit:contain;background:#080a08;border:1px solid #303a2d;border-radius:4px}
 .alignment-overlay-preview small{font-size:8px;line-height:1.5;color:#899383}
+
+
+/* Compact live Correction Accuracy report */
+.correction-accuracy-panel{margin-top:17px;padding:14px;border:1px solid #394333;border-radius:8px;background:linear-gradient(145deg,#171d17,#141715);display:grid;gap:13px}
+.accuracy-report-heading{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.accuracy-report-heading h3{margin:5px 0 0;color:#e2e9dc;font-size:13px;font-weight:570}
+.accuracy-overall-score{display:grid;justify-items:end;gap:3px}
+.accuracy-overall-score>span,.accuracy-overall-score>b{font-size:7px;letter-spacing:1px;color:#899583}
+.accuracy-overall-score>strong{font-size:24px;line-height:1;color:#d9e2d1;font-variant-numeric:tabular-nums}
+.accuracy-overall-score>strong small{font-size:10px;color:#899583}
+.accuracy-overall-score>b{padding:4px 6px;border:1px solid #5a4c35;border-radius:3px;color:#d5b37a}
+.accuracy-report-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.accuracy-report-section{min-width:0;padding:10px;border:1px solid #303a2e;border-radius:6px;background:#101511}
+.accuracy-section-title{display:flex;justify-content:space-between;gap:5px;align-items:center}
+.accuracy-section-title>b{font-size:7px;letter-spacing:.65px;color:#c0cfad}
+.accuracy-section-title>span{font-size:6px;letter-spacing:.5px;color:#b59b6c;white-space:nowrap}
+.accuracy-metric-main{display:flex;align-items:baseline;gap:7px;margin:12px 0}
+.accuracy-metric-main strong{font-size:23px;line-height:1;color:#dfe7d7;font-variant-numeric:tabular-nums}
+.accuracy-metric-main small{font-size:8px;color:#7f897a}
+.accuracy-metric-detail{display:flex;justify-content:space-between;gap:6px;padding-top:7px;margin-top:7px;border-top:1px solid #293128;font-size:8px}
+.accuracy-metric-detail span{color:#7f897a}
+.accuracy-metric-detail b{color:#b9c4b0;font-weight:500;text-align:right}
+.accuracy-channel-values{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:11px 0}
+.accuracy-channel-values>div{display:grid;gap:3px;padding:7px 5px;text-align:center;border:1px solid #2c352a;border-radius:4px;background:#151b15}
+.accuracy-channel-values small,.accuracy-percentile-list small{font-size:7px;color:#899583}
+.accuracy-channel-values b,.accuracy-percentile-list b{font-size:12px;color:#dce5d4;font-variant-numeric:tabular-nums}
+.accuracy-percentile-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:11px 0}
+.accuracy-percentile-list>span{display:grid;gap:3px;padding:5px 3px;text-align:center;border:1px solid #2c352a;border-radius:3px;background:#151b15}
+.accuracy-percentile-list b{font-size:10px}
+.accuracy-report-footer{display:flex;justify-content:space-between;gap:15px;padding:11px;border:1px solid #3b3b30;border-radius:5px;background:#171914}
+.accuracy-report-footer>div:first-child{min-width:0;flex:1}
+.accuracy-report-footer>div:first-child>b{font-size:8px;letter-spacing:.8px;color:#d2b47e}
+.accuracy-report-footer p{margin:5px 0 0;color:#9da594;font-size:9px;line-height:1.55}
+.accuracy-live-controls{display:flex;flex-wrap:wrap;align-content:center;justify-content:flex-end;gap:5px;max-width:225px}
+.accuracy-live-controls>span{width:100%;font-size:7px;letter-spacing:.7px;color:#818b79;text-align:right}
+.accuracy-live-controls>b{padding:5px 6px;border:1px solid #35402f;border-radius:3px;color:#c6d6b2;font-size:8px;white-space:nowrap}
+.accuracy-report-note{font-size:8px;line-height:1.5;color:#798374}
+@media(max-width:900px){.accuracy-report-grid{grid-template-columns:1fr}.accuracy-report-section{padding:11px}.accuracy-report-footer{flex-direction:column}.accuracy-live-controls{max-width:none;justify-content:flex-start}.accuracy-live-controls>span{text-align:left}}
+@media(max-width:520px){.accuracy-report-heading{align-items:flex-start}.accuracy-overall-score>strong{font-size:21px}.accuracy-section-title>b{font-size:7px}}
