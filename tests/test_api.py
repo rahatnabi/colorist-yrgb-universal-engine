@@ -637,3 +637,53 @@ def test_video_temporal_report_rejects_frame_count_over_limit():
         files={"file": ("clip.mp4", b"mock-video", "video/mp4")},
     )
     assert response.status_code == 422
+
+def test_video_roi_temporal_report_returns_dense_fixed_roi_samples(monkeypatch):
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    def fake_decode(_path, *, timestamp_seconds):
+        value = 0.1 + timestamp_seconds
+        return PrecisionFrame.from_interleaved(
+            width=2, height=2, channel_names=("R", "G", "B"),
+            values=(value, value, value, value, value, value,
+                    value, value, value, value, value, value),
+            source_path="clip.mp4", decoder="mock-ffmpeg",
+            encoding=ColorEncoding(transfer="bt709"),
+        )
+
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-roi-temporal-report?interval_seconds=0.04&frame_count=24&minimum_samples=24",
+        files={"file": ("clip.mp4", b"mock-original-video", "video/mp4")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["sampling"]["sample_count"] == 24
+    assert payload["sampling"]["frame_index_semantics"].startswith("sample ordinal")
+    assert payload["temporal_analysis"]["dense_sampling"] is True
+    assert payload["temporal_analysis"]["flicker_assessment"]["status"] == "inconclusive"
+    assert payload["temporal_analysis"]["exposure_drift_assessment"]["status"] == "unavailable"
+    assert len(payload["samples"]) == 24
+    assert payload["samples"][0]["roi_measurement"]["pixel_count"] == 1
+    assert payload["measurement_domain"] == "ffmpeg_rgb_float32_decoder_output"
+
+
+def test_video_roi_temporal_report_rejects_roi_outside_frame():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-roi-temporal-report?roi_x=0.8&roi_width=0.3",
+        files={"file": ("clip.mp4", b"mock-video", "video/mp4")},
+    )
+    assert response.status_code == 422
+    assert "ROI rectangle" in response.json()["detail"]
+
+
+def test_video_roi_temporal_report_rejects_more_than_240_samples():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-roi-temporal-report?frame_count=241",
+        files={"file": ("clip.mp4", b"mock-video", "video/mp4")},
+    )
+    assert response.status_code == 422
+

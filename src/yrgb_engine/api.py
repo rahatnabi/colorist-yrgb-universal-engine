@@ -523,6 +523,124 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             await file.close()
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
+    @app.post("/v1/media/video-roi-temporal-report")
+    async def media_video_roi_temporal_report(
+        file: UploadFile = File(...),
+        start_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+        interval_seconds: float = Query(default=1 / 25, gt=0.0, le=1.0),
+        frame_count: int = Query(default=48, ge=3, le=240),
+        minimum_samples: int = Query(default=24, ge=3, le=240),
+        roi_x: float = Query(default=0.25, ge=0.0, le=1.0),
+        roi_y: float = Query(default=0.25, ge=0.0, le=1.0),
+        roi_width: float = Query(default=0.5, gt=0.0, le=1.0),
+        roi_height: float = Query(default=0.5, gt=0.0, le=1.0),
+    ) -> dict[str, Any]:
+        """Run bounded dense fixed-ROI RGB sampling and conservative temporal analysis.
+
+        Frame indices in this report are sample ordinals, not source frame indices.
+        The decoder RGB domain is preserved; no linearization or camera transform
+        is applied, so exposure-stop metrics remain unavailable.
+        """
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-roi-temporal-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+            if start_seconds + (frame_count - 1) * interval_seconds > 86400.0:
+                raise HTTPException(status_code=422, detail="Requested sample timestamps exceed the 86400-second limit.")
+            if roi_x + roi_width > 1.0 or roi_y + roi_height > 1.0:
+                raise HTTPException(status_code=422, detail="ROI rectangle must remain inside normalized frame bounds.")
+
+            from .dense_temporal import analyze_dense_roi_samples
+            from .oiio_decoder import HighPrecisionDecodeError
+            from .roi import measure_normalized_rgb_roi
+            from .video_precision import decode_video_float_frame
+
+            roi_id = f"normalized:{roi_x:.9f},{roi_y:.9f},{roi_width:.9f},{roi_height:.9f}"
+            measured_samples: list[dict[str, Any]] = []
+            sample_reports: list[dict[str, Any]] = []
+            for sample_index in range(frame_count):
+                timestamp = start_seconds + sample_index * interval_seconds
+                try:
+                    frame = await run_in_threadpool(
+                        decode_video_float_frame, temporary_path, timestamp_seconds=timestamp
+                    )
+                    measurement = await run_in_threadpool(
+                        measure_normalized_rgb_roi, frame,
+                        x=roi_x, y=roi_y, width=roi_width, height=roi_height,
+                    )
+                except HighPrecisionDecodeError as exc:
+                    message = str(exc)
+                    if "required" in message.lower() or "install ffmpeg" in message.lower() or "not found on path" in message.lower():
+                        raise HTTPException(status_code=503, detail=message) from exc
+                    raise HTTPException(status_code=422, detail=message) from exc
+                means = {name: measurement["channels"][name]["mean"] for name in ("R", "G", "B")}
+                measured_samples.append({
+                    "timestamp_seconds": timestamp,
+                    "frame_index": sample_index,
+                    "roi_id": roi_id,
+                    "measurement_domain": measurement["measurement_domain"],
+                    "reference_validated_transform": False,
+                    "roi_mean": means,
+                })
+                sample_reports.append({
+                    "sample_index": sample_index,
+                    "source_frame_index": None,
+                    "timestamp_seconds": timestamp,
+                    "roi_measurement": measurement,
+                })
+
+            analysis = await run_in_threadpool(
+                analyze_dense_roi_samples, measured_samples,
+                expected_interval_seconds=interval_seconds,
+                minimum_samples=minimum_samples,
+            )
+            digest = await run_in_threadpool(
+                lambda: hashlib.sha256(Path(temporary_path).read_bytes()).hexdigest()
+            )
+            return {
+                "filename": filename,
+                "size_bytes": total,
+                "source_sha256": digest,
+                "sampling": {
+                    "start_seconds": start_seconds,
+                    "interval_seconds": interval_seconds,
+                    "sample_count": len(sample_reports),
+                    "minimum_samples_for_dense_analysis": minimum_samples,
+                    "frame_index_semantics": "sample ordinal only; source frame index and timecode unresolved",
+                },
+                "roi": {
+                    "x": roi_x, "y": roi_y, "width": roi_width, "height": roi_height,
+                    "coordinate_space": "normalized", "identity": roi_id,
+                },
+                "measurement_domain": measured_samples[0]["measurement_domain"],
+                "temporal_analysis": analysis,
+                "samples": sample_reports,
+                "limitations": [
+                    "ROI is fixed in image coordinates and does not track a moving subject.",
+                    "Dense sampling does not prove periodic flicker; this endpoint does not estimate flicker frequency.",
+                    "Exposure stops are unavailable because no reference-validated scene-linear transform is applied.",
+                    "Source frame indices and timecode are not independently resolved from timestamps.",
+                ],
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
     @app.post("/v1/media/video-sample")
     async def media_video_sample(
         file: UploadFile = File(...),
