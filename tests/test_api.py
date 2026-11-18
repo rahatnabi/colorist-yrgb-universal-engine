@@ -128,3 +128,49 @@ def test_video_frame_endpoint_rejects_negative_timestamp():
         files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
     )
     assert response.status_code == 422
+
+
+def test_video_sample_endpoint_analyzes_bounded_frames_and_cut_candidates(monkeypatch):
+    from yrgb_engine.precision import PrecisionFrame
+
+    timestamps = []
+    values_by_time = {
+        1.0: [0.0, 0.0, 0.0, 0.1, 0.1, 0.1],
+        2.5: [0.0, 0.0, 0.0, 0.1, 0.1, 0.1],
+        4.0: [0.9, 0.9, 0.9, 1.0, 1.0, 1.0],
+    }
+
+    def fake_decode(_path, *, timestamp_seconds=0.0):
+        timestamps.append(timestamp_seconds)
+        return PrecisionFrame.from_interleaved(
+            width=2, height=1, channel_names=("R", "G", "B"),
+            values=values_by_time[timestamp_seconds], source_path="fixture",
+            decoder="test-ffmpeg", sample_domain="test_video_source_values",
+        )
+
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-sample?start_seconds=1&interval_seconds=1.5&frame_count=3&shot_change_threshold=0.5",
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert timestamps == [1.0, 2.5, 4.0]
+    assert payload["frame_count"] == 3
+    assert [item["timestamp_seconds"] for item in payload["frames"]] == timestamps
+    assert payload["frames"][0]["histogram_distance"] is None
+    assert payload["frames"][0]["shot_change_candidate"] is False
+    assert payload["frames"][1]["histogram_distance"] == 0.0
+    assert payload["frames"][2]["histogram_distance"] > 0.5
+    assert payload["frames"][2]["shot_change_candidate"] is True
+    assert payload["frames"][2]["mean_luminance_delta"] is None
+
+
+def test_video_sample_endpoint_rejects_more_than_24_frames():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-sample?frame_count=25",
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 422
