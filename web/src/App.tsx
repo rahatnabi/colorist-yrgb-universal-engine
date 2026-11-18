@@ -15,11 +15,17 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function ScopePanel({ title, subtitle, icon }: { title: string; subtitle: string; icon: React.ReactNode }) {
+function ScopePanel({ title, subtitle, icon, histogram, raster }: { title: string; subtitle: string; icon: React.ReactNode; histogram?: ScopeHistogram; raster?: ScopeRaster }) {
+  const hasSignal = !!histogram || !!raster;
+  const maxCount = histogram ? Math.max(1, ...histogram.counts) : 1;
   return <section className="scope-panel">
-    <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">NO SIGNAL</span></div>
-    <div className="scope-screen"><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div><div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div></div>
-    <div className="scope-foot">{subtitle}</div>
+    <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
+    <div className="scope-screen"><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
+      {histogram ? <div className="histogram-bars">{histogram.counts.map((count, index) => <i key={index} style={{ height: (Math.max(1, count / maxCount * 100)) + "%" }} />)}</div>
+      : raster ? <svg className="raster-scope" viewBox={"0 0 " + raster.width + " " + raster.height} preserveAspectRatio="none">{raster.counts.flatMap((column, x) => column.map((count, y) => count > 0 ? <rect key={x + "-" + y} x={x} y={y} width="1" height="1" opacity={Math.min(1, 0.18 + count / 8)} /> : null))}</svg>
+      : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
+    </div>
+    <div className="scope-foot">{subtitle}{histogram ? " · under/over: " + histogram.underflow + "/" + histogram.overflow : raster ? " · under/over: " + raster.underflow + "/" + raster.overflow : ""}</div>
   </section>;
 }
 
@@ -28,6 +34,8 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [analysisNote, setAnalysisNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
@@ -60,6 +68,18 @@ export default function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Media inspection failed");
       setProbe(data as ProbeResponse);
+      const lowerName = selected.name.toLowerCase();
+      const imageLike = selected.type.startsWith("image/") || [".dng", ".tif", ".tiff", ".exr", ".dpx", ".png", ".jpg", ".jpeg"].some(ext => lowerName.endsWith(ext));
+      if (imageLike) {
+        setAnalysisNote("Decoding high-precision still image for sample-domain scopes…");
+        const analysisBody = new FormData(); analysisBody.append("file", selected);
+        const analysisResponse = await fetch(API_BASE + "/v1/media/analyze", { method: "POST", body: analysisBody });
+        const analysisData = await analysisResponse.json();
+        if (!analysisResponse.ok) setAnalysisNote(analysisData.detail || "Precision decoder unavailable. Install the OpenImageIO extra.");
+        else { setAnalysis(analysisData as AnalysisResponse); setAnalysisNote("Decoded by engine. Values are source sample-domain measurements; no input transform or IRE scale is assumed."); }
+      } else if (selected.type.startsWith("video/")) {
+        setAnalysisNote("Video frame sampling is the next integration step; no video scopes are fabricated.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not reach the media API");
     } finally { setBusy(false); }
@@ -135,14 +155,15 @@ export default function App() {
           </section>
         </div>
 
-        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><span className="subtle-tag">AWAITING DECODED FRAME</span></div>
+        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div>
+        {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
-          <ScopePanel title="Waveform" subtitle="Luma / RGB · calibrated scale pending" icon={<Activity size={15} />} />
-          <ScopePanel title="RGB Parade" subtitle="R · G · B channel distribution" icon={<AudioWaveform size={15} />} />
-          <ScopePanel title="Histogram" subtitle="Channel distribution · headroom aware" icon={<Gauge size={15} />} />
+          <ScopePanel title="Waveform" subtitle="Luma / RGB · explicit coefficients required" icon={<Activity size={15} />} />
+          <ScopePanel title="RGB Parade" subtitle="R channel · decoded source values" icon={<AudioWaveform size={15} />} raster={analysis?.analysis.rgb_parade.R} />
+          <ScopePanel title="Histogram" subtitle="R channel · 128 bins · code-value range 0–1" icon={<Gauge size={15} />} histogram={analysis?.analysis.histograms.R} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
-        <div className="bottom-disclaimer"><span>ENGINE NOTE</span> Browser preview is not a color-managed reference display. Scope panels remain empty until decoded-frame analysis is connected; no fabricated scope signal is shown.</div>
+        <div className="bottom-disclaimer"><span>ENGINE NOTE</span> Browser preview is not a color-managed reference display. Histogram and parade show decoded source sample values only. No camera transform, IRE scale, luminance interpretation or calibrated vectorscope is inferred.</div>
       </section>
     </div>
   </main>;
