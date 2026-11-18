@@ -75,6 +75,38 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         ],
     )
 
+    @app.get("/v1/learning/curriculum")
+    async def learning_curriculum() -> dict[str, Any]:
+        """Return the beginner-to-advanced still-image grading curriculum."""
+        from .learning import curriculum_payload
+        return curriculum_payload()
+
+    @app.get("/v1/learning/exercises")
+    async def learning_exercises(
+        level: str | None = Query(default=None, pattern="^(beginner|intermediate|advanced)$"),
+    ) -> dict[str, Any]:
+        """List available still-image learning exercises."""
+        from .learning import list_exercises
+        return {"count": len(list_exercises(level=level)), "exercises": list_exercises(level=level)}
+
+    @app.get("/v1/learning/lessons/{lesson_id}")
+    async def learning_lesson(lesson_id: str) -> dict[str, Any]:
+        """Fetch one still-image lesson by stable identifier."""
+        from .learning import get_lesson
+        lesson = get_lesson(lesson_id)
+        if lesson is None:
+            raise HTTPException(status_code=404, detail="Learning lesson not found.")
+        return lesson
+
+    @app.get("/v1/learning/exercises/{exercise_id}")
+    async def learning_exercise(exercise_id: str) -> dict[str, Any]:
+        """Fetch one still-image exercise by stable identifier."""
+        from .learning import get_exercise
+        exercise = get_exercise(exercise_id)
+        if exercise is None:
+            raise HTTPException(status_code=404, detail="Learning exercise not found.")
+        return exercise
+
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": "colorist-yrgb-engine"}
