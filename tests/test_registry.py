@@ -326,3 +326,33 @@ def test_apple_log_and_apple_log2_are_distinct_exact_profiles():
         encoding="Apple Log",
         gamut="Apple Gamut",
     ) is None
+
+
+def test_aces_candidate_mappings_are_not_mistaken_for_validated_transforms():
+    registry = ProfileRegistry.load()
+    sony = registry.get_by_id("sony.slog3.sgamut3cine")
+    apple = registry.get_by_id("apple.applelog")
+    assert sony["ocio_source_space"] == "S-Log3 S-Gamut3.Cine"
+    assert sony["ocio_destination_space"] == "DaVinci Intermediate WideGamut"
+    assert sony["transform_mapping_status"] == "mapped_unvalidated"
+    assert sony["usable_for_transform"] is False
+    assert apple["ocio_source_space"] == "Apple Log"
+    assert apple["usable_for_transform"] is False
+
+
+def test_profile_mapping_without_independent_reference_evidence_is_blocked():
+    registry = ProfileRegistry([{
+        "id": "test.mapped.only",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "status": "unverified",
+        "transform_id": "test.transform",
+        "ocio_source_space": "Example Log",
+        "ocio_destination_space": "DaVinci Intermediate WideGamut",
+        "output_transfer": "DaVinci Intermediate",
+        "output_primaries": "DaVinci Wide Gamut",
+    }])
+    profile = registry.get_by_id("test.mapped.only")
+    assert profile["transform_mapping_status"] == "mapped_unvalidated"
+    assert profile["usable_for_transform"] is False
