@@ -145,11 +145,11 @@
       "manufacturer": "Apple",
       "camera_models": [],
       "encoding": "Apple Log",
-      "gamut": null,
-      "generation": null,
+      "gamut": "BT.2020",
+      "generation": "Apple Log",
       "transform_id": null,
       "status": "unverified",
-      "notes": "Device and capture application metadata may be required."
+      "notes": "Apple Log uses BT.2020 primaries and an Apple-defined Log transfer function. Recording support starts with iPhone 15 Pro; preserve the exact transfer-function metadata. Not transform-validated."
     },
     {
       "id": "blackmagic.film_gen4.pocket_4k_6k",
@@ -205,6 +205,17 @@
       "transform_id": null,
       "status": "unverified",
       "notes": "Separate from Log3G10; requires exact RED camera/decode metadata and independent reference validation."
+    },
+    {
+      "id": "apple.applelog2.apple_gamut",
+      "manufacturer": "Apple",
+      "camera_models": [],
+      "encoding": "Apple Log 2",
+      "gamut": "Apple Gamut",
+      "generation": "Apple Log 2",
+      "transform_id": null,
+      "status": "unverified",
+      "notes": "Apple Log 2 uses Apple Gamut primaries and an Apple-defined Log transfer function. Recording support starts with iPhone 17 Pro. Keep separate from Apple Log / BT.2020; not transform-validated."
     }
   ]
 }
