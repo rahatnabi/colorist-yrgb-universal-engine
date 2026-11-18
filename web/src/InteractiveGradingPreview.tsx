@@ -22,11 +22,21 @@ type Props = {
   profileId: string;
   cameraModel: string;
   apiBase: string;
+  onNativeMeasurements?: (analysis: {
+    width: number; height: number; decoder: string; sample_domain: string;
+    analysis: {
+      histograms: Record<string, { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number }>;
+      rgb_parade: Record<string, { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number }>;
+      waveform: { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number } | null;
+      vectorscope_points: [number, number][] | null;
+      scope_note: string; note: string;
+    };
+  }) => void;
   onRender?: (result: InteractivePreviewAnalysis) => void;
   onReset?: () => void;
 };
 
-export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, workingSpaceId, sourceFile, profileId, cameraModel, apiBase, onRender, onReset }: Props) {
+export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, workingSpaceId, sourceFile, profileId, cameraModel, apiBase, onNativeMeasurements, onRender, onReset }: Props) {
   const onRenderRef = useRef(onRender);
   onRenderRef.current = onRender;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -236,6 +246,20 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || "Native measurements failed.");
       setMeasurementResult(payload);
+      onNativeMeasurements?.({
+        width: payload.frame.width,
+        height: payload.frame.height,
+        decoder: "YRGB native float32 grading pipeline",
+        sample_domain: payload.scopes.sample_domain,
+        analysis: {
+          histograms: payload.scopes.analysis.histograms,
+          rgb_parade: payload.scopes.analysis.rgb_parade,
+          waveform: payload.scopes.analysis.waveform,
+          vectorscope_points: payload.scopes.analysis.vectorscope_points,
+          scope_note: payload.scope_axis + " · native validated linear working-space measurements; not IRE or nits.",
+          note: "All scopes are calculated from the same native graded float32 frame used for Correction Accuracy.",
+        },
+      });
       setMeasurementStatus("Measurements calculated from the same validated native graded float32 frame.");
     } catch (error) {
       setMeasurementStatus(error instanceof Error ? error.message : "Native measurements failed.");
