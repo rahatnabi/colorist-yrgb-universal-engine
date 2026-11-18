@@ -268,7 +268,7 @@ export default function App() {
 
           <section className="card profile-card">
             <div className="card-heading"><div><span className="section-kicker">INPUT TRANSFORM RESEARCH</span><h2>Camera Profile</h2></div><ScanSearch size={18} className="muted-icon" /></div>
-            {ocioStatus && <p className="profile-note">OCIO CONFIG · {ocioStatus.status.replaceAll("_", " ").toUpperCase()}{ocioStatus.config_name ? " · " + ocioStatus.config_name : ""}{ocioStatus.ocio_version ? " · OCIO " + ocioStatus.ocio_version : ""}{ocioStatus.note ? " — " + ocioStatus.note : ""}</p>}
+            {ocioStatus && <p className="profile-note">OCIO CONFIG · {ocioStatus.status.replace(/_/g, " ").toUpperCase()}{ocioStatus.config_name ? " · " + ocioStatus.config_name : ""}{ocioStatus.ocio_version ? " · OCIO " + ocioStatus.ocio_version : ""}{ocioStatus.note ? " — " + ocioStatus.note : ""}</p>}
             <form onSubmit={findProfiles} className="profile-form">
               <label>MANUFACTURER<input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="e.g. Sony" required /></label>
               <label>LOG / GAMMA ENCODING<input value={encoding} onChange={e => setEncoding(e.target.value)} placeholder="e.g. S-Log3" /></label>
