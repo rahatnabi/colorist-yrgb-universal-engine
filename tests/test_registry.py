@@ -358,3 +358,9 @@ def test_profile_mapping_without_independent_reference_evidence_is_blocked():
     profile = registry.get_by_id("test.mapped.only")
     assert profile["transform_mapping_status"] == "mapped_unvalidated"
     assert profile["usable_for_transform"] is False
+
+
+def test_dji_dlog_candidate_uses_exact_aces_studio_space_name():
+    profile = ProfileRegistry.load().get_by_id("dji.dlog")
+    assert profile["ocio_source_space"] == "D-Log D-Gamut"
+    assert profile["usable_for_transform"] is False
