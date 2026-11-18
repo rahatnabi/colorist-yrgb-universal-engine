@@ -42,3 +42,29 @@ Implemented: explicit OCIO CPU transform adapter and strict .cube parser.
 Not yet implemented or validated: bundled DWG/Intermediate-to-Rec.709 config,
 verified manufacturer camera transforms, LUT interpolation/application,
 LUT intensity/A-B controls, GPU acceleration, and reference-chart validation.
+
+
+## Color matching diagnostics
+
+`yrgb_engine.color_matching.analyze_color_region` measures a caller-selected ROI
+in validated linear RGB and reports mean RGB, XYZ, CIE Lab, RGB chromaticity,
+channel balance and luminance. The caller must supply the RGB-to-XYZ matrix and
+XYZ reference white for the declared working space. The engine checks that the
+matrix is finite, 3x3 and invertible; it cannot independently prove that the
+matrix/white-point pair actually belongs to the named space.
+
+`compare_color_regions` requires identical `working_space_id` values and
+reports RGB/Lab deltas, CIE76 Delta E, separate exposure-stop delta, and channel
+balance delta. A Delta E threshold is optional and caller-defined; no universal
+pass/fail threshold is assumed. This is a mean-RGB-to-Lab diagnostic approximation,
+not pixelwise Delta E averaging and not a replacement for a validated chart-based
+camera characterization workflow.
+
+Different `transform_id` values are allowed when the upstream transforms have
+been independently validated to the same destination working space. The engine
+does not select, apply, or validate camera transforms. Negative RGB is not
+supported by this Lab diagnostic path and is rejected rather than silently clipped.
+
+Skin-tone tools are not included in this stage. A future skin diagnostic must be
+explicitly scoped as pixel/ROI color analysis, avoid face identity or demographic
+inference, and require a user-selected region rather than guessing from an image.
