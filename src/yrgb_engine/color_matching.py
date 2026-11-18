@@ -39,6 +39,7 @@ class ColorMatchReport:
     delta_e76: float
     exposure_delta_stops: float | None
     channel_balance_delta: tuple[float, float, float] | None
+    threshold_exceeded: bool | None
 
 
 def _validate_matrix(matrix: tuple[tuple[float, float, float], ...]) -> None:
@@ -153,4 +154,5 @@ def compare_color_regions(
     return ColorMatchReport(
         reference, candidate, delta_rgb, delta_lab, delta_e76,
         exposure_delta, balance_delta,
+        delta_e76 > delta_e_threshold if delta_e_threshold is not None else None,
     )
