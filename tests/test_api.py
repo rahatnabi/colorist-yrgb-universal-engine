@@ -178,9 +178,9 @@ def test_video_sample_endpoint_rejects_more_than_24_frames():
 
 def test_lut_export_endpoint_resamples_cube_to_requested_size():
     source = (
-        "TITLE \"Tiny identity\"\\nLUT_3D_SIZE 2\\n"
-        "0 0 0\\n1 0 0\\n0 1 0\\n1 1 0\\n"
-        "0 0 1\\n1 0 1\\n0 1 1\\n1 1 1\\n"
+        "TITLE \"Tiny identity\"\nLUT_3D_SIZE 2\n"
+        "0 0 0\n1 0 0\n0 1 0\n1 1 0\n"
+        "0 0 1\n1 0 1\n0 1 1\n1 1 1\n"
     )
     client = TestClient(create_app(registry=ProfileRegistry([])))
     response = client.post(
