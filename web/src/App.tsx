@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";
 import InteractiveGradingPreview from "./InteractiveGradingPreview";
+import TransformValidationPanel from "./TransformValidationPanel";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
@@ -378,6 +379,7 @@ export default function App() {
                   }} /><span>Attach Sony / camera XML metadata without treating it as proof of pixel encoding.</span></label>
                   {Object.keys(sidecarMetadata).length > 0 && <details open><summary>XML sidecar metadata · {Object.keys(sidecarMetadata).length} fields</summary><div className="camera-metadata-grid">{Object.entries(sidecarMetadata).map(([key, value]) => <div key={key}><small>{key}</small><b>{value}</b></div>)}</div></details>}
                   {Object.keys(capture).length > 0 && <details><summary>View complete extracted capture metadata</summary><pre>{JSON.stringify(capture, null, 2)}</pre></details>}
+                  <TransformValidationPanel apiBase={API_BASE} />
                 </section>;
               })()}
               {probe?.probe.warnings?.length ? <div className="warning-line">{probe.probe.warnings.join(" · ")}</div> : null}
