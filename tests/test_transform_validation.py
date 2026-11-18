@@ -85,7 +85,7 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
         destination_space="Linear DaVinci WideGamut",
         config_path=config,
         output_transfer="Linear",
-        output_primaries="Linear DaVinci WideGamut",
+        output_primaries="DaVinci Wide Gamut",
         profile_id="test.camera.profile",
     )
     with pytest.raises(TransformValidationError, match="did not pass"):
@@ -127,13 +127,13 @@ def test_apply_marks_frame_validated_only_after_matching_evidence(tmp_path, monk
         destination_space="Linear DaVinci WideGamut",
         config_path=config,
         output_transfer="Linear",
-        output_primaries="Linear DaVinci WideGamut",
+        output_primaries="DaVinci Wide Gamut",
         profile_id="test.camera.profile",
     )
     assert transformed.encoding.validated is True
     assert transformed.encoding.working_space_id == "Linear DaVinci WideGamut"
     assert transformed.encoding.transfer == "Linear"
-    assert transformed.encoding.primaries == "Linear DaVinci WideGamut"
+    assert transformed.encoding.primaries == "DaVinci Wide Gamut"
     assert transformed.encoding.transform_id == "test.camera.to.working"
     assert transformed.metadata["yrgb_transform_validation"]["reference_set_id"] == "independent-fixture-v1"
 
@@ -149,7 +149,7 @@ def test_apply_rejects_mismatched_camera_registry_profile(tmp_path):
             destination_space="Linear DaVinci WideGamut",
             config_path=config,
             output_transfer="Linear",
-            output_primaries="Linear DaVinci WideGamut",
+            output_primaries="DaVinci Wide Gamut",
             profile_id="canon.clog3.cinema_gamut",
         )
 
