@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from yrgb_engine.api import create_app
-from yrgb_engine.learning import EXERCISES, LESSONS, curriculum_payload, get_exercise, get_lesson, list_exercises
+from yrgb_engine.learning import EXERCISES, curriculum_payload, get_exercise, get_lesson, list_exercises
 from yrgb_engine.registry import ProfileRegistry
 
 
