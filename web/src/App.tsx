@@ -67,6 +67,7 @@ export default function App() {
   const [manufacturer, setManufacturer] = useState("Sony");
   const [encoding, setEncoding] = useState("S-Log3");
   const [gamut, setGamut] = useState("");
+  const [cameraModel, setCameraModel] = useState("");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileNote, setProfileNote] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("");
@@ -141,6 +142,7 @@ export default function App() {
     event.preventDefault(); setProfileNote("Searching profile registry…"); setProfiles([]);
     const params = new URLSearchParams({ manufacturer, encoding });
     if (gamut.trim()) params.set("gamut", gamut.trim());
+    if (cameraModel.trim()) params.set("camera_model", cameraModel.trim());
     try {
       const response = await fetch(`${API_BASE}/v1/profiles/candidates?${params}`);
       const data = await response.json();
@@ -193,7 +195,7 @@ export default function App() {
                   if (!file || !selectedProfileId) return;
                   setTransformPreviewBusy(true); setTransformPreviewNote("Preparing validated camera transform and preview-only display conversion…");
                   try {
-                    const body = new FormData(); body.append("file", file); body.append("profile_id", selectedProfileId);
+                    const body = new FormData(); body.append("file", file); body.append("profile_id", selectedProfileId); if (cameraModel.trim()) body.append("camera_model", cameraModel.trim());
                     const previewEndpoint = isVideo ? "/v1/media/video-transform-preview?timestamp_seconds=" + encodeURIComponent(frameTimestamp) : "/v1/media/transform-preview";
                     const response = await fetch(API_BASE + previewEndpoint, { method: "POST", body });
                     if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Transform preview failed"); }
@@ -273,6 +275,7 @@ export default function App() {
               <label>MANUFACTURER<input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="e.g. Sony" required /></label>
               <label>LOG / GAMMA ENCODING<input value={encoding} onChange={e => setEncoding(e.target.value)} placeholder="e.g. S-Log3" /></label>
               <label>COLOR GAMUT <span className="optional">OPTIONAL FILTER</span><input value={gamut} onChange={e => setGamut(e.target.value)} placeholder="e.g. S-Gamut3.Cine" /></label>
+              <label>CAMERA MODEL <span className="optional">EXACT MODEL WHEN KNOWN</span><input value={cameraModel} onChange={e => setCameraModel(e.target.value)} placeholder="e.g. FX6 / Pocket Cinema Camera 6K" /></label>
               <button className="primary-button" type="submit" disabled={!apiOnline}><ScanSearch size={15} /> Find exact candidates</button>
             </form>
             {profileNote && <p className="profile-note">{profileNote}</p>}
