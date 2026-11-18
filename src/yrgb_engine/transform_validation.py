@@ -227,6 +227,10 @@ def apply_reference_validated_transform(
         raise TransformValidationError("Complete profile, transform, and output encoding identities are required.")
     if result.profile_id != profile_id or frame.encoding.profile_id != profile_id:
         raise TransformValidationError("Frame, selected camera profile, and validation evidence must have the same profile ID.")
+    if output_transfer.strip().casefold() not in {"linear", "scene-linear", "linear-light"}:
+        raise TransformValidationError("Correction Accuracy requires a scene-linear output transfer; encoded grading spaces are not accepted.")
+    if not destination_space.strip().casefold().startswith("linear "):
+        raise TransformValidationError("Correction Accuracy requires an explicitly named linear-light destination color space.")
     path = Path(config_path)
     if not path.is_file() or sha256(path.read_bytes()).hexdigest() != result.config_sha256:
         raise TransformValidationError("OCIO config hash differs from the validated config.")
