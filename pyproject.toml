@@ -13,7 +13,7 @@ authors = [{ name = "COLORIST YRGB" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27"]
+dev = ["pytest>=8.0", "ruff>=0.6", "httpx>=0.27", "numpy>=1.26"]
 images = ["Pillow>=10.0"]
 high-precision = ["OpenImageIO>=2.4", "numpy>=1.26"]
 raw = ["rawpy>=0.19", "numpy>=1.26"]
