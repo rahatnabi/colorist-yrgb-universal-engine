@@ -6,6 +6,7 @@ when its status is verified and a transform_id is declared.
 from __future__ import annotations
 
 import json
+from math import isfinite
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -88,11 +89,20 @@ class ProfileRegistry:
             and validation.get("transform_id") == record.get("transform_id")
             and isinstance(validation.get("config_sha256"), str)
             and len(validation["config_sha256"]) == 64
+            and all(character in "0123456789abcdef" for character in validation["config_sha256"].casefold())
             and isinstance(validation.get("reference_set_id"), str)
             and bool(validation["reference_set_id"].strip())
             and isinstance(validation.get("vector_count"), int)
             and not isinstance(validation.get("vector_count"), bool)
             and validation["vector_count"] > 0
+            and isinstance(validation.get("tolerance"), (int, float))
+            and not isinstance(validation.get("tolerance"), bool)
+            and isfinite(validation["tolerance"])
+            and validation["tolerance"] > 0
+            and isinstance(validation.get("max_absolute_error"), (int, float))
+            and not isinstance(validation.get("max_absolute_error"), bool)
+            and isfinite(validation["max_absolute_error"])
+            and 0 <= validation["max_absolute_error"] <= validation["tolerance"]
             and isinstance(validation.get("source_space"), str)
             and bool(validation["source_space"].strip())
             and isinstance(validation.get("destination_space"), str)
