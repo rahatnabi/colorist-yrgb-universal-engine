@@ -1393,6 +1393,143 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 Path(temporary_path).unlink(missing_ok=True)
 
 
+    @app.post("/v1/media/native-grade-export")
+    async def media_native_grade_export(
+        file: UploadFile = File(...),
+        profile_id: str = Form(..., min_length=1, max_length=160),
+        export_format: str = Form(default="exr"),
+        camera_model: str | None = Form(default=None, max_length=120),
+        exposure_stops: float = Form(default=0.0, ge=-8.0, le=8.0),
+        contrast: float = Form(default=1.0, ge=0.0, le=3.0),
+        pivot: float = Form(default=0.18, ge=0.001, le=1.0),
+        saturation: float = Form(default=1.0, ge=0.0, le=3.0),
+        temperature_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        tint_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        curve_midpoint: float = Form(default=0.5, ge=0.1, le=0.9),
+    ) -> FileResponse:
+        """Export the full-resolution validated scene-linear graded still as float32 TIFF/EXR."""
+        from dataclasses import replace
+        from .grading_pipeline import GradingPipelineError, process_validated_still
+        from .look import LookSettings
+        from .native_export import (
+            NativeExportError, native_frame_sha256, save_native_float_image,
+        )
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+
+        normalized_format = export_format.casefold().lstrip(".")
+        if normalized_format not in {"exr", "tif", "tiff"}:
+            raise HTTPException(status_code=422, detail="Choose EXR or TIFF float32 export.")
+        extension = ".exr" if normalized_format == "exr" else ".tiff"
+        media_type = "image/x-exr" if normalized_format == "exr" else "image/tiff"
+        profile = profile_registry.get_by_id(profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Selected camera profile is not in the registry.")
+        if not profile.get("usable_for_transform"):
+            raise HTTPException(status_code=409, detail="Selected camera profile is not reference-validated; native export is blocked.")
+        required_models = profile.get("camera_models", [])
+        if required_models and (
+            not camera_model
+            or not any(camera_model.casefold() == model.casefold() for model in required_models)
+        ):
+            raise HTTPException(status_code=422, detail="Select the exact supported camera model for this profile.")
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        working_space = str(profile.get("ocio_destination_space", ""))
+        if not config_value or not working_space:
+            raise HTTPException(status_code=503, detail="Configure the pinned YRGB OCIO config on the server.")
+
+        filename = Path(file.filename or "still.tif").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        export_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-native-export-source-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds the 512 MiB limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded still image is empty.")
+            try:
+                frame = await run_in_threadpool(decode_oiio_float, temporary_path)
+            except HighPrecisionDecodeError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            if frame.width * frame.height > 40_000_000:
+                raise HTTPException(status_code=413, detail="Decoded still exceeds the 40 megapixel limit.")
+            frame = replace(
+                frame,
+                encoding=replace(frame.encoding, profile_id=profile_id),
+                metadata={**frame.metadata, "yrgb_selected_camera_profile": profile_id},
+            )
+            coefficients = (
+                (0.2722287, 0.6740818, 0.0536895)
+                if "aces" in working_space.casefold()
+                else (0.2126, 0.7152, 0.0722)
+            )
+            settings = LookSettings(
+                exposure_stops=exposure_stops, contrast=contrast, pivot=pivot,
+                saturation=saturation, temperature_shift=temperature_shift,
+                tint_shift=tint_shift, luminance_coefficients=coefficients,
+                master_curve=((0.0, 0.0), (0.5, curve_midpoint), (1.0, 1.0)),
+            )
+            try:
+                result = await run_in_threadpool(
+                    process_validated_still,
+                    frame,
+                    settings,
+                    registry=profile_registry,
+                    config_path=config_value,
+                    working_space_id=working_space,
+                    display_space_id=working_space,
+                    display_transfer="Linear",
+                    display_primaries=str(profile.get("output_primaries", "unknown")),
+                )
+                graded = result.graded_frame
+                digest = native_frame_sha256(graded)
+            except (GradingPipelineError, NativeExportError) as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"Native full-resolution grading failed: {exc}") from exc
+
+            with tempfile.NamedTemporaryFile(prefix="yrgb-native-master-", suffix=extension, delete=False) as output:
+                export_path = output.name
+            try:
+                await run_in_threadpool(save_native_float_image, graded, export_path)
+            except NativeExportError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            response = FileResponse(
+                export_path,
+                media_type=media_type,
+                filename=f"{Path(filename).stem}_YRGB_master{extension}",
+                headers={
+                    "X-YRGB-Export-Scope": "full-resolution",
+                    "X-YRGB-Sample-Format": "float32",
+                    "X-YRGB-Sample-Domain": "validated-scene-linear",
+                    "X-YRGB-Working-Space": working_space,
+                    "X-YRGB-Transform-ID": str(graded.encoding.transform_id or ""),
+                    "X-YRGB-Frame-Width": str(graded.width),
+                    "X-YRGB-Frame-Height": str(graded.height),
+                    "X-YRGB-Float-Samples-SHA256": digest,
+                    "X-YRGB-Clamped": "false",
+                },
+                background=BackgroundTask(lambda cleanup_path=export_path: Path(cleanup_path).unlink(missing_ok=True)),
+            )
+            export_path = None
+            return response
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+            if export_path:
+                Path(export_path).unlink(missing_ok=True)
+
+
     @app.post("/v1/media/native-grade-preview")
     async def media_native_grade_preview(
         file: UploadFile = File(...),
