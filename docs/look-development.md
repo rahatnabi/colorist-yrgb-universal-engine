@@ -20,3 +20,18 @@ This first version is a deterministic look/LUT engine, not yet a complete
 interactive pixel preview or a validated camera-to-display pipeline. Camera
 input transforms and Rec.709 output transforms must be explicitly selected and
 validated separately before production use.
+
+
+## Applying the look to frames
+
+`apply_look_to_frame` applies the same controls to a `PrecisionFrame` only
+when the frame is explicitly validated, declares a linear transfer, and its
+working-space ID exactly matches the look input-space ID. It preserves alpha
+and auxiliary channels and keeps the working-space identity unchanged.
+
+Still-image export now requires a validated output transform and matching
+output-space/transfer declarations. The export function does not manufacture a
+display transform. A production JPEG/PNG/TIFF render therefore needs a
+validated output transform first. The API currently exposes LUT baking; direct
+upload-to-graded-image rendering and video render/export are subsequent
+integration steps.
