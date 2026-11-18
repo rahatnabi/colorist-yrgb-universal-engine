@@ -18,17 +18,28 @@ type Props = {
   settings: InteractiveLookSettings;
   curveMidpoint: number;
   workingSpaceId: "scene-linear-rec709" | "acescg-linear";
+  sourceFile: File | null;
+  profileId: string;
+  cameraModel: string;
+  apiBase: string;
   onRender?: (result: InteractivePreviewAnalysis) => void;
   onReset?: () => void;
 };
 
-export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, workingSpaceId, onRender, onReset }: Props) {
+export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, workingSpaceId, sourceFile, profileId, cameraModel, apiBase, onRender, onReset }: Props) {
   const onRenderRef = useRef(onRender);
   onRenderRef.current = onRender;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState("Waiting for a browser-decodable still image");
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [nativePreviewUrl, setNativePreviewUrl] = useState("");
+  const [nativeStatus, setNativeStatus] = useState("Select a reference-validated camera profile to enable native rendering.");
+  const [nativeBusy, setNativeBusy] = useState(false);
+
+  useEffect(() => () => {
+    if (nativePreviewUrl) URL.revokeObjectURL(nativePreviewUrl);
+  }, [nativePreviewUrl]);
 
   useEffect(() => {
     if (!sourceUrl) {
@@ -141,6 +152,42 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     });
   }, [settings, curveMidpoint, workingSpaceId, dimensions]);
 
+
+  async function renderNativePreview() {
+    if (!sourceFile || !profileId) return;
+    setNativeBusy(true);
+    setNativeStatus("Processing the still through the validated native pipeline…");
+    try {
+      const body = new FormData();
+      body.append("file", sourceFile);
+      body.append("profile_id", profileId);
+      if (cameraModel) body.append("camera_model", cameraModel);
+      body.append("exposure_stops", String(settings.exposure_stops));
+      body.append("contrast", String(settings.contrast));
+      body.append("pivot", String(settings.pivot));
+      body.append("saturation", String(settings.saturation));
+      body.append("temperature_shift", String(settings.temperature_shift));
+      body.append("tint_shift", String(settings.tint_shift));
+      body.append("curve_midpoint", String(curveMidpoint));
+      const response = await fetch(apiBase + "/v1/media/native-grade-preview", {
+        method: "POST",
+        body,
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Native still render failed.");
+      }
+      const blob = await response.blob();
+      const nextUrl = URL.createObjectURL(blob);
+      setNativePreviewUrl(nextUrl);
+      setNativeStatus("Native float32 grade rendered · display PNG preview only · not a delivery master.");
+    } catch (error) {
+      setNativeStatus(error instanceof Error ? error.message : "Native still render failed.");
+    } finally {
+      setNativeBusy(false);
+    }
+  }
+
   function exportPreview() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -165,6 +212,16 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       {sourceUrl ? <canvas ref={canvasRef} aria-label="Interactive graded image preview" /> : <span>Upload a still image to see grading changes.</span>}
     </div>
     <div className="grading-preview-status">{status}</div>
+    <div className="native-grading-action">
+      <button type="button" className="preview-export-button" disabled={!sourceFile || !profileId || nativeBusy} onClick={renderNativePreview}>
+        {nativeBusy ? "RENDERING NATIVE…" : "RENDER THROUGH NATIVE ENGINE"}
+      </button>
+      <span>{nativeStatus}</span>
+    </div>
+    {nativePreviewUrl && <div className="native-grading-result">
+      <b>NATIVE PIPELINE OUTPUT · DISPLAY PREVIEW</b>
+      <img src={nativePreviewUrl} alt="Native float32 graded still-image preview" />
+    </div>}
     <p className="grading-preview-caveat">Preview pipeline: browser-decoded sRGB → selected linear working space → look operations → sRGB display. This is a responsive creative preview, not a camera Log transform, validated OCIO pipeline, calibrated monitor output, or full-resolution master export. Camera Log images need an explicitly validated input transform before accuracy scoring.</p>
   </section>;
 }
