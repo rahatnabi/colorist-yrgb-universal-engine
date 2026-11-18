@@ -48,3 +48,19 @@ The frontend contact sheet creates temporary object URLs for the selected local 
 The comparison workspace lets the user select two images and view them side by side. After batch analysis, it shows the difference between the selected images' decoded RGB channel means (B − A). These numbers are not exposure stops, white-balance differences, perceptual color distances, or a shot-match score. No image registration, crop alignment, subject tracking, or color-space normalization is performed.
 
 Object URLs are temporary and revoked when the selected image list changes or the component is unmounted. The source files are not modified.
+
+
+## Feature-based image alignment and reference comparison
+
+The `POST /v1/media/align-compare` endpoint accepts two still images: a reference and a candidate. It decodes both through the configured OpenImageIO adapter, detects ORB features, matches descriptors, and estimates a candidate-to-reference homography with RANSAC. It reports feature inliers, inlier ratio, overlap area, and the 3×3 transform matrix. The analysis raster is downscaled to a maximum dimension of 1280 pixels for registration and comparison.
+
+RGB comparison is calculated only over the warped overlap area. Per channel, the response reports reference mean, aligned candidate mean, candidate-minus-reference mean delta, mean absolute difference and root-mean-square difference. The operation is non-destructive; original uploaded files are not rewritten.
+
+Install the optional dependencies with `pip install -e ".[vision,high-precision,api]"`. OpenCV is not a mandatory base dependency. Without it, the endpoint returns a clear dependency error.
+
+Important limitations:
+- ORB/RANSAC estimates geometric correspondence; it is not a guarantee of semantic subject alignment. Repeated patterns, low texture, large occlusions, moving subjects and strong perspective changes can fail or produce misleading matches.
+- The homography matrix maps candidate analysis-raster coordinates to reference analysis-raster coordinates. It is not a full-resolution camera calibration.
+- RGB metrics are decoded sample-value comparisons, not Delta E, exposure stops, calibrated luminance or white-balance measurements.
+- Matching sample-domain labels do not prove matching primaries, transfer functions, ICC profiles, camera transforms or display rendering.
+- No automatic color normalization or display transform is applied. Users should compare images with verified matching colorimetry before interpreting the channel metrics as color consistency.
