@@ -87,6 +87,71 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             "note": "Choose the exact camera model, encoding and gamut; no transform is inferred.",
         }
 
+
+    @app.get("/v1/ocio/status")
+    async def ocio_config_status() -> dict[str, Any]:
+        """Report exact OCIO config availability without applying any transforms."""
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        if not config_value:
+            return {
+                "configured": False,
+                "status": "not_configured",
+                "note": "Set YRGB_OCIO_CONFIG to a server-managed pinned OCIO config file.",
+            }
+        config_path = Path(config_value)
+        if not config_path.is_file():
+            return {
+                "configured": False,
+                "status": "config_file_missing",
+                "note": "Configured OCIO file is not readable on this server.",
+            }
+        try:
+            import PyOpenColorIO as ocio
+            config = ocio.Config.CreateFromFile(str(config_path))
+            names = set(config.getColorSpaceNames())
+            version = str(ocio.GetVersion())
+        except ImportError:
+            return {
+                "configured": False,
+                "status": "ocio_dependency_missing",
+                "note": "Install the ocio optional dependency on the API server.",
+            }
+        except Exception as exc:
+            return {
+                "configured": False,
+                "status": "invalid_config",
+                "note": f"OCIO config could not be loaded: {exc}",
+            }
+
+        mapped_profiles = []
+        for profile in profile_registry.list_profiles():
+            source = profile.get("ocio_source_space")
+            destination = profile.get("ocio_destination_space")
+            if source or destination:
+                mapped_profiles.append({
+                    "profile_id": profile["id"],
+                    "source_space": source,
+                    "source_available": source in names if isinstance(source, str) else False,
+                    "destination_space": destination,
+                    "destination_available": destination in names if isinstance(destination, str) else False,
+                    "reference_validated": bool(
+                        profile_registry.get_by_id(profile["id"]).get("usable_for_transform")
+                    ),
+                })
+        preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
+        return {
+            "configured": True,
+            "status": "ready" if preview_space and preview_space in names else "config_loaded_preview_space_unavailable",
+            "config_name": config_path.name,
+            "config_sha256": __import__("hashlib").sha256(config_path.read_bytes()).hexdigest(),
+            "ocio_version": version,
+            "color_space_count": len(names),
+            "preview_space": preview_space or None,
+            "preview_space_available": preview_space in names if preview_space else False,
+            "mapped_profiles": mapped_profiles,
+            "note": "Config name availability does not certify camera transform accuracy; reference validation remains a separate gate.",
+        }
+
     @app.post("/v1/media/probe")
     async def media_probe(file: UploadFile = File(...)) -> dict[str, Any]:
         """Probe one bounded upload; temporary bytes are removed after inspection."""
