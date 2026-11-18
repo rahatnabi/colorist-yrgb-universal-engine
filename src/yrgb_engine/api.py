@@ -1437,8 +1437,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     frame = await run_in_threadpool(decode_oiio_float, temporary_paths[-1])
                 except HighPrecisionDecodeError as exc:
                     raise HTTPException(status_code=422, detail=f"{filename}: {exc}") from exc
-                if frame.width * frame.height > 40_000_000:
-                    raise HTTPException(status_code=413, detail=f"{filename} exceeds 40 megapixels.")
+                if frame.width * frame.height > 12_000_000:
+                    raise HTTPException(status_code=413, detail=f"{filename} exceeds the 12 megapixel alignment limit.")
                 decoded.append(frame)
 
             try:
