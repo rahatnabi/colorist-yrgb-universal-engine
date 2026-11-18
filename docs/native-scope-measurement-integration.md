@@ -19,7 +19,7 @@ The endpoint returns the working-space ID, transform ID, validation state, image
 
 - The frame must carry a reference-validated transform and linear-light transfer.
 - The ROI is expressed in full-resolution source pixels and must be fully inside the decoded still.
-- The neutral ROI is learner-selected. The engine measures it but does not claim to recognize a gray card or prove that the selected patch is neutral.
+- The neutral ROI is learner-selected, must contain at least 16 pixels, and must be fully inside the source still. The engine measures it but does not claim to recognize a gray card or prove that the selected patch is neutral.
 - The scope range is explicitly `[-0.25, 4.0]` in linear working-space sample values. This preserves negative values and highlight headroom for diagnostics.
 - Waveform and vectorscope use working-space luminance coefficients (Rec.709 or ACEScg as selected by the profile's destination space).
 - These scopes are **not IRE, legal video levels, or calibrated nits**. Clipping counts use explicit linear thresholds 0.0 and 1.0; values above 1.0 are still preserved in the measured frame.
