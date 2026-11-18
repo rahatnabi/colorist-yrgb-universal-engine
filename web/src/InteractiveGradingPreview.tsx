@@ -17,11 +17,12 @@ type Props = {
   filename: string;
   settings: InteractiveLookSettings;
   curveMidpoint: number;
+  workingSpaceId: "scene-linear-rec709" | "acescg-linear";
   onRender?: (result: InteractivePreviewAnalysis) => void;
   onReset?: () => void;
 };
 
-export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, onRender, onReset }: Props) {
+export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, workingSpaceId, onRender, onReset }: Props) {
   const onRenderRef = useRef(onRender);
   onRenderRef.current = onRender;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,7 +85,7 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     if (!context) return;
     context.drawImage(source, 0, 0);
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-    const graded = applyInteractiveLook(pixels, { settings, curve_midpoint: curveMidpoint });
+    const graded = applyInteractiveLook(pixels, { settings, curve_midpoint: curveMidpoint, working_space_id: workingSpaceId });
     context.putImageData(graded, 0, 0);
 
     const width = canvas.width;
@@ -138,7 +139,7 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
         note: "Live graded preview scope statistics · browser sRGB display-referred sample domain.",
       },
     });
-  }, [settings, curveMidpoint, dimensions]);
+  }, [settings, curveMidpoint, workingSpaceId, dimensions]);
 
   function exportPreview() {
     const canvas = canvasRef.current;
@@ -164,6 +165,6 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       {sourceUrl ? <canvas ref={canvasRef} aria-label="Interactive graded image preview" /> : <span>Upload a still image to see grading changes.</span>}
     </div>
     <div className="grading-preview-status">{status}</div>
-    <p className="grading-preview-caveat">Preview pipeline: browser-decoded sRGB → linear-sRGB look operations → sRGB display. This is a responsive creative preview, not a camera Log transform, validated OCIO pipeline, calibrated monitor output, or full-resolution master export. Camera Log images need an explicitly validated input transform before accuracy scoring.</p>
+    <p className="grading-preview-caveat">Preview pipeline: browser-decoded sRGB → selected linear working space → look operations → sRGB display. This is a responsive creative preview, not a camera Log transform, validated OCIO pipeline, calibrated monitor output, or full-resolution master export. Camera Log images need an explicitly validated input transform before accuracy scoring.</p>
   </section>;
 }
