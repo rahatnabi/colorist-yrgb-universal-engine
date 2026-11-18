@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -13,6 +14,7 @@ from .signatures import detect_signature
 
 DEFAULT_TIMEOUT_SECONDS = 20
 DEFAULT_MAX_FILE_BYTES = 100 * 1024 * 1024 * 1024
+_BIT_DEPTH_SUFFIX = re.compile(r"(?:p|rgb|gbr)(9|10|12|14|16)(?:le|be)?$", re.IGNORECASE)
 
 
 def _read_header(path: Path, length: int = 32) -> bytes:
@@ -24,22 +26,8 @@ def _run_ffprobe(path: Path, timeout: int) -> dict[str, Any]:
     executable = shutil.which("ffprobe")
     if not executable:
         raise FileNotFoundError("ffprobe executable was not found on PATH")
-
-    command = [
-        executable,
-        "-v", "error",
-        "-show_format",
-        "-show_streams",
-        "-of", "json",
-        str(path),
-    ]
-    completed = subprocess.run(
-        command,
-        capture_output=True,
-        check=False,
-        text=True,
-        timeout=timeout,
-    )
+    command = [executable, "-v", "error", "-show_format", "-show_streams", "-of", "json", str(path)]
+    completed = subprocess.run(command, capture_output=True, check=False, text=True, timeout=timeout)
     if completed.returncode != 0:
         detail = completed.stderr.strip() or "ffprobe could not parse this file"
         raise ValueError(detail)
@@ -52,22 +40,112 @@ def _run_ffprobe(path: Path, timeout: int) -> dict[str, Any]:
     return payload
 
 
+def _scalar_tags(*tag_sets: Any) -> dict[str, str]:
+    """Merge metadata tags as strings without interpreting vendor-specific names."""
+    merged: dict[str, str] = {}
+    for tags in tag_sets:
+        if not isinstance(tags, dict):
+            continue
+        for key, value in tags.items():
+            if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                merged[str(key).casefold()] = str(value)
+    return merged
+
+
+def _first_tag(tags: dict[str, str], *names: str) -> str | None:
+    for name in names:
+        value = tags.get(name.casefold())
+        if value and value.strip():
+            return value.strip()
+    return None
+
+
+def _reported_bit_depth(stream: dict[str, Any]) -> int | None:
+    for key in ("bits_per_raw_sample", "bits_per_coded_sample", "bits_per_sample"):
+        try:
+            depth = int(stream.get(key))
+        except (TypeError, ValueError):
+            continue
+        if 1 <= depth <= 64:
+            return depth
+    pixel_format = stream.get("pix_fmt")
+    if isinstance(pixel_format, str):
+        match = _BIT_DEPTH_SUFFIX.search(pixel_format)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def extract_capture_metadata(payload: dict[str, Any]) -> dict[str, Any]:
+    """Extract only explicitly reported camera/capture facts; unknowns stay null."""
+    streams = payload.get("streams", [])
+    if not isinstance(streams, list):
+        streams = []
+    video_stream = next(
+        (stream for stream in streams if isinstance(stream, dict)
+         and stream.get("codec_type") == "video"),
+        {},
+    )
+    format_info = payload.get("format")
+    if not isinstance(format_info, dict):
+        format_info = {}
+    tags = _scalar_tags(format_info.get("tags"), video_stream.get("tags"))
+    codec = video_stream.get("codec_name")
+    pixel_format = video_stream.get("pix_fmt")
+    model = _first_tag(tags, "model", "camera_model")
+    recording_mode = _first_tag(
+        tags, "recording_mode", "record_mode", "shooting_mode", "video_mode"
+    )
+    bit_depth = _reported_bit_depth(video_stream)
+    return {
+        "camera_make": _first_tag(tags, "make", "manufacturer", "camera_make"),
+        "camera_model": model,
+        "recording_mode": recording_mode,
+        "codec": codec if isinstance(codec, str) and codec else None,
+        "codec_profile": video_stream.get("profile") if isinstance(video_stream.get("profile"), str) else None,
+        "codec_tag": video_stream.get("codec_tag_string") if isinstance(video_stream.get("codec_tag_string"), str) else None,
+        "pixel_format": pixel_format if isinstance(pixel_format, str) else None,
+        "bit_depth": bit_depth,
+        "color_transfer": video_stream.get("color_transfer"),
+        "color_primaries": video_stream.get("color_primaries"),
+        "color_matrix": video_stream.get("color_space"),
+        "color_range": video_stream.get("color_range"),
+        "firmware_version": _first_tag(tags, "firmware_version", "firmware", "camera_firmware"),
+        "metadata_tags": tags,
+        "metadata_completeness": {
+            "camera_model": model is not None,
+            "recording_mode": recording_mode is not None,
+            "codec": isinstance(codec, str) and bool(codec),
+            "bit_depth": bit_depth is not None,
+        },
+        "interpretation": (
+            "Metadata reported by the container/stream only. Missing values are unknown; "
+            "camera model, recording mode, Log curve, and gamut are never inferred."
+        ),
+    }
+
+
 def _image_metadata(path: Path) -> dict[str, Any]:
     try:
         from PIL import Image
     except ImportError:
         return {"metadata_reader": "unavailable", "note": "Install the 'images' extra for Pillow metadata."}
-
     try:
         with Image.open(path) as image:
+            exif = image.getexif()
+            make, model = exif.get(271), exif.get(272)
             return {
-                "metadata_reader": "Pillow",
-                "format": image.format,
-                "width": image.width,
-                "height": image.height,
-                "mode": image.mode,
+                "metadata_reader": "Pillow", "format": image.format,
+                "width": image.width, "height": image.height, "mode": image.mode,
                 "frames": getattr(image, "n_frames", 1),
                 "icc_profile_present": bool(image.info.get("icc_profile")),
+                "capture_metadata": {
+                    "camera_make": str(make).strip() if make else None,
+                    "camera_model": str(model).strip() if model else None,
+                    "recording_mode": None, "codec": None, "bit_depth": None,
+                    "firmware_version": None,
+                    "interpretation": "EXIF values only; absent values are unknown.",
+                },
             }
     except Exception as exc:  # Pillow raises format-specific exceptions.
         return {"metadata_reader": "Pillow", "metadata_error": str(exc)}
@@ -82,17 +160,11 @@ def probe_media(
     """Inspect a media asset without assuming its extension is truthful."""
     path = Path(file_path).expanduser()
     suffix = path.suffix.lower()
-    result = MediaProbeResult(
-        path=str(path),
-        exists=path.is_file(),
-        extension=suffix,
-    )
-
+    result = MediaProbeResult(path=str(path), exists=path.is_file(), extension=suffix)
     if not result.exists:
         result.status = "not_found"
         result.warnings.append("Path does not point to an existing regular file.")
         return result
-
     try:
         result.size_bytes = path.stat().st_size
         if result.size_bytes > max_file_bytes:
@@ -106,9 +178,7 @@ def probe_media(
         return result
 
     family, signature = detect_signature(header, suffix)
-    result.detected_type = family
-    result.signature = signature
-
+    result.detected_type, result.signature = family, signature
     if family == "video":
         if signature == "unverified-extension":
             result.warnings.append("Video extension is unverified; container signature was not recognized.")
@@ -117,24 +187,23 @@ def probe_media(
             result.metadata = payload
             streams = payload.get("streams", [])
             result.status = "probed"
+            result.metadata["capture_metadata"] = extract_capture_metadata(payload)
             result.metadata["stream_summary"] = [
                 {
-                    "index": stream.get("index"),
-                    "codec_type": stream.get("codec_type"),
-                    "codec_name": stream.get("codec_name"),
-                    "width": stream.get("width"),
-                    "height": stream.get("height"),
-                    "pix_fmt": stream.get("pix_fmt"),
-                    "bit_rate": stream.get("bit_rate"),
-                    "avg_frame_rate": stream.get("avg_frame_rate"),
+                    "index": stream.get("index"), "codec_type": stream.get("codec_type"),
+                    "codec_name": stream.get("codec_name"), "profile": stream.get("profile"),
+                    "codec_tag_string": stream.get("codec_tag_string"),
+                    "width": stream.get("width"), "height": stream.get("height"),
+                    "pix_fmt": stream.get("pix_fmt"), "bit_depth": _reported_bit_depth(stream),
+                    "bit_rate": stream.get("bit_rate"), "avg_frame_rate": stream.get("avg_frame_rate"),
                     "color_space": stream.get("color_space"),
                     "color_transfer": stream.get("color_transfer"),
                     "color_primaries": stream.get("color_primaries"),
                     "color_range": stream.get("color_range"),
                 }
-                for stream in streams
+                for stream in streams if isinstance(stream, dict)
             ]
-            if not any(s.get("codec_type") == "video" for s in streams):
+            if not any(isinstance(s, dict) and s.get("codec_type") == "video" for s in streams):
                 result.warnings.append("No video stream was reported by ffprobe.")
         except FileNotFoundError as exc:
             result.status = "probe_unavailable"
@@ -157,12 +226,10 @@ def probe_media(
         if signature == "tiff":
             result.warnings.append("TIFF signature alone cannot distinguish ordinary TIFF from every TIFF-based RAW variant.")
         return result
-
     if family == "lut":
         result.status = "candidate"
         result.warnings.append("LUT parsing and input/output color-space validation are not implemented yet.")
         return result
-
     result.status = "unsupported_or_unknown"
     result.warnings.append("No supported media signature or recognized extension was found.")
     return result
