@@ -9,11 +9,13 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any
+from dataclasses import asdict
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
+from .analysis import analyze_frame
 from .capabilities import capabilities_as_dict
 from .probe import probe_media
 from .registry import ProfileRegistry
@@ -105,6 +107,79 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             result = await run_in_threadpool(probe_media, temporary_path)
             payload = result.to_dict() if hasattr(result, "to_dict") else result.__dict__
             return {"filename": filename, "size_bytes": total, "probe": payload}
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
+    @app.post("/v1/media/analyze")
+    async def media_analyze(file: UploadFile = File(...)) -> dict[str, Any]:
+        """Decode a still through OpenImageIO and return sample-domain scopes.
+
+        No camera transform, transfer-function assumption, IRE mapping, or
+        exposure interpretation is applied by this endpoint.
+        """
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-analysis-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.",
+                        )
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+            from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+
+            try:
+                frame = await run_in_threadpool(decode_oiio_float, temporary_path)
+            except HighPrecisionDecodeError as exc:
+                if "required. Install" in str(exc):
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            if frame.width * frame.height > 40_000_000:
+                raise HTTPException(status_code=413, detail="Decoded image exceeds 40 megapixel analysis limit.")
+            if not all(name.upper() in {c.upper() for c in frame.channel_names} for name in ("R", "G", "B")):
+                raise HTTPException(status_code=422, detail="Decoded image does not expose named R, G and B channels.")
+
+            result = await run_in_threadpool(
+                analyze_frame,
+                frame,
+                histogram_bins=128,
+                scope_width=128,
+                scope_height=96,
+                value_range=(0.0, 1.0),
+            )
+            return {
+                "filename": filename,
+                "decoder": frame.decoder,
+                "width": frame.width,
+                "height": frame.height,
+                "sample_domain": frame.sample_domain,
+                "encoding": asdict(frame.encoding),
+                "analysis": {
+                    "channels": {key: asdict(value) for key, value in result.channels.items()},
+                    "histograms": {key: asdict(value) for key, value in result.histograms.items()},
+                    "rgb_parade": {key: asdict(value) for key, value in result.rgb_parade.items()},
+                    "waveform": None,
+                    "luminance": None,
+                    "vectorscope_points": None,
+                    "note": "Code-value analysis only. No IRE, luminance, vectorscope or camera transform is inferred.",
+                },
+            }
         except HTTPException:
             raise
         except (OSError, ValueError, TypeError) as exc:
