@@ -940,3 +940,151 @@ def test_native_grade_preview_uses_shared_pipeline_and_returns_preview_only(tmp_
     assert seen["working_space"] == working_space
     assert seen["settings"].exposure_stops == pytest.approx(1.5)
     assert seen["settings"].master_curve == ((0.0, 0.0), (0.5, 0.58), (1.0, 1.0))
+
+
+def test_native_measurements_uses_same_validated_graded_frame_for_scopes_and_accuracy(tmp_path, monkeypatch):
+    import hashlib
+    from pathlib import Path
+    from types import SimpleNamespace
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "pinned-measure.ocio"
+    config.write_text("measure-pinned-config")
+    profile_id = "test.measure.camera"
+    transform_id = "test.camera.to.linear"
+    source_space = "Test Camera Log"
+    working_space = "Linear DaVinci WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id,
+        "manufacturer": "Test",
+        "encoding": "Test Log",
+        "gamut": "Test Gamut",
+        "status": "verified",
+        "transform_id": transform_id,
+        "ocio_source_space": source_space,
+        "ocio_destination_space": working_space,
+        "output_transfer": "Linear",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True,
+            "profile_id": profile_id,
+            "transform_id": transform_id,
+            "source_space": source_space,
+            "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-independent-measurement-reference",
+            "vector_count": 16,
+            "max_absolute_error": 0.00001,
+            "tolerance": 0.0001,
+            "ocio_version": "test",
+        },
+    }])
+    source = PrecisionFrame.from_interleaved(
+        width=2, height=2, channel_names=("R", "G", "B"),
+        values=(0.18, 0.18, 0.18) * 4, source_path="fixture", decoder="test",
+        encoding=ColorEncoding(),
+    )
+    graded = PrecisionFrame.from_interleaved(
+        width=2, height=2, channel_names=("R", "G", "B"),
+        values=(0.18, 0.18, 0.18) * 4, source_path="fixture", decoder="test",
+        encoding=ColorEncoding(
+            primaries="DaVinci Wide Gamut", transfer="Linear",
+            profile_id=profile_id, validated=True,
+            working_space_id=working_space, transform_id=transform_id,
+        ),
+        sample_domain="validated_linear_native_grade_float32",
+        purpose="graded_still_candidate",
+    )
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", lambda _path: source)
+    monkeypatch.setattr(
+        "yrgb_engine.grading_pipeline.process_validated_still",
+        lambda *_args, **_kwargs: SimpleNamespace(graded_frame=graded),
+    )
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    monkeypatch.setenv("YRGB_PREVIEW_SPACE", "Preview sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_TRANSFER", "sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_PRIMARIES", "BT.709")
+
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-measurements",
+        data={
+            "profile_id": profile_id,
+            "roi_x": "0", "roi_y": "0", "roi_width": "2", "roi_height": "2",
+            "exposure_stops": "0.0",
+        },
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["measurement_source"] == "same_validated_native_graded_float32_frame"
+    assert payload["validated"] is True
+    assert payload["scopes"]["sample_domain"] == "validated_linear_native_grade_float32"
+    assert payload["scopes"]["analysis"]["waveform"] is not None
+    assert payload["scopes"]["analysis"]["vectorscope_points"] is not None
+    assert payload["correction_accuracy"]["status"] == "scored"
+    assert payload["correction_accuracy"]["score"] == pytest.approx(100.0)
+    assert payload["correction_accuracy"]["exposure"]["metrics"][0]["measured"] == pytest.approx(0.0)
+
+
+def test_native_measurements_reject_roi_outside_still_before_processing(tmp_path, monkeypatch):
+    import hashlib
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "pinned-roi.ocio"
+    config.write_text("roi-pinned-config")
+    profile_id = "test.roi.camera"
+    transform_id = "test.roi.transform"
+    source_space = "ROI Camera Log"
+    working_space = "Linear DaVinci WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id, "manufacturer": "Test", "encoding": "Test Log",
+        "gamut": "Test Gamut", "status": "verified", "transform_id": transform_id,
+        "ocio_source_space": source_space, "ocio_destination_space": working_space,
+        "output_transfer": "Linear", "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True, "profile_id": profile_id, "transform_id": transform_id,
+            "source_space": source_space, "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-roi-reference", "vector_count": 8,
+            "max_absolute_error": 0.00001, "tolerance": 0.0001, "ocio_version": "test",
+        },
+    }])
+    frame = PrecisionFrame.from_interleaved(
+        width=2, height=2, channel_names=("R", "G", "B"),
+        values=(0.18, 0.18, 0.18) * 4, source_path="fixture", decoder="test",
+        encoding=ColorEncoding(),
+    )
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", lambda _path: frame)
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    monkeypatch.setenv("YRGB_PREVIEW_SPACE", "Preview sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_TRANSFER", "sRGB")
+    monkeypatch.setenv("YRGB_PREVIEW_PRIMARIES", "BT.709")
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-measurements",
+        data={
+            "profile_id": profile_id, "roi_x": "1", "roi_y": "1",
+            "roi_width": "2", "roi_height": "2",
+        },
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 422
+    assert "inside the decoded still" in response.json()["detail"]
+
+
+def test_native_measurements_blocks_unverified_profile():
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine", "manufacturer": "Sony",
+        "encoding": "S-Log3", "gamut": "S-Gamut3.Cine",
+        "status": "unverified", "transform_id": None,
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-measurements",
+        data={"profile_id": "sony.slog3.sgamut3cine", "roi_x": "0",
+              "roi_y": "0", "roi_width": "1", "roi_height": "1"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 409
+    assert "not reference-validated" in response.json()["detail"]
