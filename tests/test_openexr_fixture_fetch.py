@@ -7,7 +7,7 @@ from scripts.fetch_openexr_fixture import FIXTURES, fetch_fixture, git_blob_sha1
 
 def test_git_blob_sha1_uses_git_object_header():
     payload = b"hello"
-    expected = hashlib.sha1(b"blob 5\\0hello").hexdigest()
+    expected = hashlib.sha1(b"blob 5\0hello").hexdigest()
     assert git_blob_sha1(payload) == expected
 
 
@@ -16,7 +16,7 @@ def test_fetch_fixture_rejects_unknown_name(tmp_path):
         fetch_fixture("not-a-fixture", tmp_path / "out.exr")
 
 
-def test_fixture_allowlist_is_immutable_and_bounded():
+def test_fixture_allowlist_is_pinned_and_bounded():
     assert set(FIXTURES) == {"line-order-increasing", "line-order-decreasing"}
     for spec in FIXTURES.values():
         assert len(spec["git_blob_sha1"]) == 40
