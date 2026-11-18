@@ -300,7 +300,7 @@ export default function App() {
           <section className="card profile-card">
             <div className="card-heading"><div><span className="section-kicker">INPUT TRANSFORM RESEARCH</span><h2>Camera Profile</h2></div><ScanSearch size={18} className="muted-icon" /></div>
             {ocioStatus && <p className="profile-note">OCIO CONFIG · {ocioStatus.status.replace(/_/g, " ").toUpperCase()}{ocioStatus.config_name ? " · " + ocioStatus.config_name : ""}{ocioStatus.ocio_version ? " · OCIO " + ocioStatus.ocio_version : ""}{ocioStatus.note ? " — " + ocioStatus.note : ""}</p>}
-            <button type="button" className="secondary-button" disabled={!apiOnline || !probe || captureMatchBusy} onClick={() => void matchDetectedCapture()}>{captureMatchBusy ? "Matching metadata…" : "Match detected capture metadata"}</button>
+            <button type="button" className="primary-button" disabled={!apiOnline || !probe || captureMatchBusy} onClick={() => void matchDetectedCapture()}>{captureMatchBusy ? "Matching metadata…" : "Match detected capture metadata"}</button>
             {captureMatch && <div className="profile-note">MATCH STATUS · {captureMatch.status.replace(/_/g, " ").toUpperCase()}<br />{captureMatch.note}<br />Selection made: NO</div>}
             <form onSubmit={findProfiles} className="profile-form">
               <label>MANUFACTURER<input value={manufacturer} onChange={e => setManufacturer(e.target.value)} placeholder="e.g. Sony" required /></label>
