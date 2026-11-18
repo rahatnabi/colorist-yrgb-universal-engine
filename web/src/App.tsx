@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, MonitorPlay, ScanSearch, UploadCloud } from "lucide-react";
+import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, ScanSearch, Settings2, UploadCloud } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
@@ -14,7 +14,6 @@ type AnalysisResponse = { width: number; height: number; decoder: string; timest
 type RoiMeasurement = { roi: { x: number; y: number; width: number; height: number; coordinate_space: string }; pixel_bounds: { left: number; top: number; right: number; bottom: number }; pixel_count: number; measurement_domain: string; channels: Record<string, { mean: number }> };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
 type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
-type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
 type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
 type BatchAnalysis = { image_count: number; images: { index: number; filename: string; width: number; height: number; sample_domain: string; channels: Record<string, { mean: number }> }[]; adjacent_comparisons: { from_index: number; to_index: number; channel_mean_delta: Record<string, number>; measurement_domain: string }[]; comparison_note: string };
