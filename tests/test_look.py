@@ -1,9 +1,12 @@
 import pytest
 
+from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
 from yrgb_engine.look import (
     LookDevelopmentError,
     LookSettings,
     apply_look_rgb,
+    apply_look_to_frame,
     bake_3d_cube,
 )
 
@@ -55,3 +58,31 @@ def test_cube_bake_has_expected_header_and_grid_entries():
 def test_look_preserves_linear_highlights_above_one_and_negative_values():
     result = apply_look_rgb((0.75, -0.1, 0.25), LookSettings(exposure_stops=1))
     assert result == pytest.approx((1.5, -0.2, 0.5))
+
+
+def test_apply_look_to_validated_linear_frame_preserves_auxiliary_channels():
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B", "A"),
+        values=(0.2, 0.4, 0.6, 0.75), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(
+            transfer="scene-linear", validated=True,
+            working_space_id="scene-linear-rec709", transform_id="camera-to-working",
+        ),
+    )
+    graded = apply_look_to_frame(
+        frame, LookSettings(exposure_stops=1),
+        input_space_id="scene-linear-rec709",
+    )
+    assert graded.pixel(0, 0) == pytest.approx((0.4, 0.8, 1.2, 0.75))
+    assert graded.encoding.validated is True
+    assert graded.encoding.working_space_id == "scene-linear-rec709"
+
+
+def test_apply_look_to_frame_rejects_unvalidated_and_non_linear_inputs():
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(transfer="unknown", working_space_id="scene-linear-rec709"),
+    )
+    with pytest.raises(LookDevelopmentError, match="validated"):
+        apply_look_to_frame(frame, LookSettings(), input_space_id="scene-linear-rec709")
