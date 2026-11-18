@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from math import isfinite, log2
 
-from .exposure import _luminance_samples, _percentile
+from .exposure import PixelRegion, _luminance_samples, _percentile
 from .precision import PrecisionFrame
 from .scoring import ScoringCriterion
 
@@ -58,7 +58,7 @@ def measure_reference_tonal_curve(
     if not frame.encoding.working_space_id or not frame.encoding.transform_id:
         raise ValueError("Tonal curve comparison requires working_space_id and transform_id.")
     _, ys = _luminance_samples(
-        frame, __import__("yrgb_engine.exposure", fromlist=["PixelRegion"]).PixelRegion(0, 0, frame.width, frame.height),
+        frame, PixelRegion(0, 0, frame.width, frame.height),
         luminance_coefficients,
     )
     candidate = tuple(_percentile(ys, p) for p in TONAL_PERCENTILES)
