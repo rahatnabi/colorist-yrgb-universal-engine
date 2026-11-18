@@ -96,6 +96,8 @@ def save_frame_image(
     normalized_format = image_format.upper()
     if normalized_format not in {"JPEG", "PNG", "TIFF"}:
         raise ImageExportError("Supported still-image exports are JPEG, PNG and TIFF.")
+    if not frame.encoding.validated:
+        raise ImageExportError("Image export requires a validated output transform.")
     if not output_space_id.strip() or frame.encoding.working_space_id != output_space_id:
         raise ImageExportError("Output space ID must match the frame's declared working space.")
     if not output_transfer.strip():
