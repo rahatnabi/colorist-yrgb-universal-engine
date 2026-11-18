@@ -8,10 +8,12 @@ This rollout is for still-image grading only. It covers image decode, explicit s
 
 The architecture is multi-family, but production approval is profile-by-profile:
 
-1. Sony S-Log3 / S-Gamut3.Cine — first reference-validation target.
-2. ARRI LogC3 / AWG3.
-3. ARRI LogC4 / AWG4.
-4. Canon C-Log3 / Cinema Gamut.
+1. Sony S-Log3 / S-Gamut3.Cine — only active implementation target.
+2. ARRI LogC3 / AWG3 — deferred.
+3. ARRI LogC4 / AWG4 — deferred.
+4. Canon C-Log3 / Cinema Gamut — deferred.
+
+Do not expand to another family until Sony's still-image path is working and its profile has the required independent reference evidence.
 
 The first profile is the implementation and validation template. The remaining families reuse the same pipeline contracts, but each requires its own exact camera/recording-mode compatibility, OCIO source-space mapping, independently sourced reference manifest, and passing validation record. No family inherits another family's approval.
 
@@ -31,7 +33,7 @@ Synthetic vectors may test validator mechanics, but cannot approve a production 
 
 ## Linear-light working data
 
-The scoring pipeline requires scene-linear / linear-light RGB in the declared working space. The transform implementation must explicitly produce that domain. A destination label such as “DaVinci Intermediate WideGamut” is not by itself proof of linear-light output; the transfer characteristic must be verified independently.
+The scoring pipeline requires scene-linear / linear-light RGB. The first Sony candidate therefore targets the ACES Studio config space `Linear DaVinci WideGamut`, not the encoded `DaVinci Intermediate WideGamut`. The transform implementation must explicitly produce that domain. A destination label such as “DaVinci Intermediate WideGamut” is not by itself proof of linear-light output; the transfer characteristic must be verified independently.
 
 For the first implementation, preserve source samples and provenance, apply the validated source transform to a linear-light working representation, and record profile ID, transform ID, OCIO config hash, reference-set ID, OCIO version, and validation evidence with the processed frame. Reject unsupported or ambiguous source encodings rather than guessing.
 
