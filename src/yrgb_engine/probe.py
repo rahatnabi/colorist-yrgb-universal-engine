@@ -133,19 +133,40 @@ def _image_metadata(path: Path) -> dict[str, Any]:
     try:
         with Image.open(path) as image:
             exif = image.getexif()
+            tags = {str(key): value for key, value in exif.items()}
             make, model = exif.get(271), exif.get(272)
+            def text_value(value: Any) -> str | None:
+                if value is None:
+                    return None
+                if isinstance(value, bytes):
+                    return value.decode("utf-8", errors="replace").strip() or None
+                return str(value).strip() or None
+            def rational(value: Any) -> str | None:
+                try:
+                    return f"{float(value):.4g}"
+                except (TypeError, ValueError, ZeroDivisionError):
+                    return text_value(value)
+            capture = {
+                "camera_make": text_value(make), "camera_model": text_value(model),
+                "recording_mode": None, "codec": None, "bit_depth": None,
+                "lens_model": text_value(exif.get(42036)),
+                "iso": text_value(exif.get(34855)),
+                "shutter_speed": rational(exif.get(33434)),
+                "aperture": rational(exif.get(33437)),
+                "focal_length_mm": rational(exif.get(37386)),
+                "white_balance": text_value(exif.get(41987)),
+                "capture_datetime": text_value(exif.get(36867) or exif.get(306)),
+                "firmware_version": text_value(exif.get(305)),
+                "color_space": text_value(exif.get(40961)),
+                "metadata_tags": tags,
+                "interpretation": "EXIF values only. Log/gamut tags may be absent; missing values are unknown and are never inferred.",
+            }
             return {
                 "metadata_reader": "Pillow", "format": image.format,
                 "width": image.width, "height": image.height, "mode": image.mode,
                 "frames": getattr(image, "n_frames", 1),
                 "icc_profile_present": bool(image.info.get("icc_profile")),
-                "capture_metadata": {
-                    "camera_make": str(make).strip() if make else None,
-                    "camera_model": str(model).strip() if model else None,
-                    "recording_mode": None, "codec": None, "bit_depth": None,
-                    "firmware_version": None,
-                    "interpretation": "EXIF values only; absent values are unknown.",
-                },
+                "capture_metadata": capture,
             }
     except Exception as exc:  # Pillow raises format-specific exceptions.
         return {"metadata_reader": "Pillow", "metadata_error": str(exc)}
