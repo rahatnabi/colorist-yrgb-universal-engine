@@ -69,3 +69,8 @@ Add features behind tests and explicit capability flags. Do not label a format a
 ## License
 
 License selection is pending. Do not assume this repository grants permission to redistribute third-party SDKs, sample footage, LUTs, or camera profiles.
+
+
+## Web workspace
+
+The early React/Vite interface is in [`web/`](web/README.md). Run the API with `uvicorn yrgb_engine.api:app --reload`, then in another terminal run `cd web && npm install && npm run dev`. The UI currently supports local browser previews, media metadata probing, and camera-profile candidate discovery. Numerical scope rendering and grading controls are not yet connected.
