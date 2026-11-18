@@ -338,7 +338,7 @@ def test_aces_candidate_mappings_are_not_mistaken_for_validated_transforms():
     sony = registry.get_by_id("sony.slog3.sgamut3cine")
     apple = registry.get_by_id("apple.applelog")
     assert sony["ocio_source_space"] == "S-Log3 S-Gamut3.Cine"
-    assert sony["ocio_destination_space"] == "DaVinci Intermediate WideGamut"
+    assert sony["ocio_destination_space"] == "Linear DaVinci WideGamut"
     assert sony["transform_mapping_status"] == "mapped_unvalidated"
     assert sony["usable_for_transform"] is False
     assert apple["ocio_source_space"] == "Apple Log"
