@@ -90,3 +90,41 @@ def test_analyze_returns_real_sample_domain_histogram_and_parade(monkeypatch):
     assert payload["analysis"]["waveform"] is None
     assert payload["analysis"]["luminance"] is None
     assert payload["analysis"]["vectorscope_points"] is None
+
+def test_video_frame_endpoint_returns_timestamped_sample_domain_analysis(monkeypatch):
+    from yrgb_engine.precision import PrecisionFrame
+
+    seen = {}
+    def fake_decode(_path, *, timestamp_seconds=0.0):
+        seen["timestamp"] = timestamp_seconds
+        return PrecisionFrame.from_interleaved(
+            width=2, height=1, channel_names=("R", "G", "B"),
+            values=[0.1, 0.2, 0.3, 0.7, 0.6, 0.5],
+            source_path="fixture", decoder="test-ffmpeg",
+            sample_domain="test_video_source_values",
+        )
+
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", fake_decode)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-frame?timestamp_seconds=2.5",
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert seen["timestamp"] == 2.5
+    assert payload["timestamp_seconds"] == 2.5
+    assert payload["decoder"] == "test-ffmpeg"
+    assert payload["sample_domain"] == "test_video_source_values"
+    assert sum(payload["analysis"]["histograms"]["R"]["counts"]) == 2
+    assert payload["analysis"]["waveform"] is None
+    assert payload["analysis"]["luminance"] is None
+
+
+def test_video_frame_endpoint_rejects_negative_timestamp():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-frame?timestamp_seconds=-0.5",
+        files={"file": ("clip.mov", b"fake-video", "video/quicktime")},
+    )
+    assert response.status_code == 422
