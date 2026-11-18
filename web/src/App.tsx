@@ -62,7 +62,7 @@ export default function App() {
   const isImage = useMemo(() => !!file && (file.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g)$/i.test(file.name)), [file]);
 
   async function inspectMedia(selected: File) {
-    setFile(selected); setProbe(null); setAnalysis(null); setAnalysisNote(""); setError(""); setBusy(true);
+    setFile(selected); setProbe(null); setAnalysis(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -146,6 +146,7 @@ export default function App() {
               {isVideo && <div className="video-frame-control">
                 <label>FRAME TIME (SECONDS)<input type="number" min="0" max="86400" step="0.1" value={frameTimestamp} onChange={e => setFrameTimestamp(e.target.value)} /></label>
                 <button type="button" disabled={busy || !apiOnline || !Number.isFinite(Number(frameTimestamp)) || Number(frameTimestamp) < 0} onClick={async () => {
+                  if (!file) return;
                   setBusy(true); setAnalysis(null); setAnalysisNote("Decoding frame at " + frameTimestamp + " seconds…");
                   try {
                     const frameBody = new FormData(); frameBody.append("file", file);
