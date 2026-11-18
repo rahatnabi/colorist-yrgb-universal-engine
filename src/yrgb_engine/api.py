@@ -1549,8 +1549,27 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 )
                 region = PixelRegion(roi_x, roi_y, roi_width, roi_height)
                 try:
-                    accuracy = await run_in_threadpool(measure_correction_accuracy, graded, region, target)
+                    exported_frame = await run_in_threadpool(decode_oiio_float, export_path)
+                    if (
+                        exported_frame.width != graded.width
+                        or exported_frame.height != graded.height
+                        or exported_frame.channel_names != graded.channel_names
+                    ):
+                        raise HTTPException(status_code=422, detail="Decoded export metadata does not match the graded source frame.")
+                    # The round-trip verifier has already compared every sample.
+                    # Only now carry the validated pipeline identity onto the decoded
+                    # export so assessment is performed on the actual written file.
+                    exported_frame = replace(
+                        exported_frame,
+                        encoding=graded.encoding,
+                        sample_domain=graded.sample_domain,
+                        purpose=graded.purpose,
+                        metadata={**exported_frame.metadata, "yrgb_roundtrip_verified": True},
+                    )
+                    accuracy = await run_in_threadpool(measure_correction_accuracy, exported_frame, region, target)
                     delivery_report = build_correction_accuracy_report(accuracy, target)
+                except HighPrecisionDecodeError as exc:
+                    raise HTTPException(status_code=422, detail=f"Could not decode exported master for delivery QC: {exc}") from exc
                 except ValueError as exc:
                     raise HTTPException(status_code=422, detail=f"Delivery QC measurement failed: {exc}") from exc
             response_headers = {
