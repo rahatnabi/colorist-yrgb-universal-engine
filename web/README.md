@@ -36,3 +36,5 @@ Open http://localhost:5173. Set `VITE_YRGB_API_URL` when the API is hosted elsew
 - Authentication, durable project storage and production deployment hardening.
 
 The UI does not fabricate scope data or apply unverified input transforms.
+
+Temporal video sampling: the Media Analysis workspace can sample 1–24 evenly spaced frames from a clip and report adjacent-frame histogram-change candidates. These are statistical candidates, not confirmed scene cuts.
