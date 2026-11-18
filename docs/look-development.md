@@ -35,3 +35,19 @@ display transform. A production JPEG/PNG/TIFF render therefore needs a
 validated output transform first. The API currently exposes LUT baking; direct
 upload-to-graded-image rendering and video render/export are subsequent
 integration steps.
+
+
+## Still-image linear EXR render
+
+`POST /v1/media/look-linear-exr` accepts multipart fields `file`,
+`input_space_id`, `linear_input_confirmed=true`, and `settings_json`.
+It decodes the still through OpenImageIO, applies the current parametric look,
+and writes a float32 OpenEXR. RGB values, including negative and above-one
+headroom, are not clamped. Alpha and named auxiliary channels are preserved.
+
+This path is intentionally an operator-attested linear workflow. It rejects
+known non-linear source transfer metadata, requires explicit confirmation, and
+marks the resulting encoding `validated=false`. The chosen working-space ID
+is a declared contract, not proof that the source was encoded in that space.
+It does not perform a camera input transform or a display/output transform.
+Use only source material known to be scene-linear in the selected space.
