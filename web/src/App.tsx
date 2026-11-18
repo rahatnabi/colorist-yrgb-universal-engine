@@ -71,6 +71,11 @@ export default function App() {
   const [lutSize, setLutSize] = useState("35");
   const [lutNote, setLutNote] = useState("");
   const [lutBusy, setLutBusy] = useState(false);
+  const [lookTitle, setLookTitle] = useState("COLORIST YRGB Look");
+  const [lookSpace, setLookSpace] = useState("scene-linear-rec709");
+  const [lookSettings, setLookSettings] = useState({ exposure_stops: 0, contrast: 1, pivot: 0.18, saturation: 1, temperature_shift: 0, tint_shift: 0 });
+  const [lookNote, setLookNote] = useState("");
+  const [lookBusy, setLookBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -249,6 +254,46 @@ export default function App() {
           <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source code-value range 0–1" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
+        <section className="card look-development-card">
+          <div className="card-heading"><div><span className="section-kicker">CREATIVE PROCESSING</span><h2>Look Development</h2></div><span className="subtle-tag">LINEAR RGB ENGINE</span></div>
+          <p className="lut-export-description">Build a parametric look and bake it directly into a 3D .cube LUT. This first version operates in linear RGB; it does not decode camera Log or perform a Rec.709 display transform.</p>
+          <div className="look-identity-fields">
+            <label>LOOK NAME<input value={lookTitle} onChange={e => setLookTitle(e.target.value)} maxLength={120} /></label>
+            <label>LINEAR RGB INPUT SPACE ID<input value={lookSpace} onChange={e => setLookSpace(e.target.value)} /></label>
+          </div>
+          <div className="look-control-grid">
+            {([
+              ["exposure_stops", "EXPOSURE", -5, 5, 0.1, "stops"],
+              ["contrast", "CONTRAST", 0, 2, 0.01, "×"],
+              ["pivot", "PIVOT", 0.01, 1, 0.01, ""],
+              ["saturation", "SATURATION", 0, 2, 0.01, "×"],
+              ["temperature_shift", "TEMP SHIFT", -1, 1, 0.01, "artistic"],
+              ["tint_shift", "TINT SHIFT", -1, 1, 0.01, "artistic"],
+            ] as const).map(([key, label, min, max, step, unit]) => <label className="look-slider" key={key}>
+              <span>{label}<b>{lookSettings[key].toFixed(key === "exposure_stops" ? 1 : 2)} {unit}</b></span>
+              <input type="range" min={min} max={max} step={step} value={lookSettings[key]} onChange={e => setLookSettings(current => ({ ...current, [key]: Number(e.target.value) }))} />
+            </label>)}
+          </div>
+          <div className="look-export-row">
+            <span>Export resolution: <b>{lutSize} Point</b></span>
+            <button type="button" className="primary-button" disabled={!apiOnline || lookBusy || !lookTitle.trim() || !lookSpace.trim()} onClick={async () => {
+              setLookBusy(true); setLookNote("Baking " + lutSize + "-point look LUT…");
+              try {
+                const response = await fetch(API_BASE + "/v1/look/export-cube", {
+                  method: "POST", headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ size: Number(lutSize), title: lookTitle, input_space_id: lookSpace, input_transfer: "scene-linear", settings: lookSettings }),
+                });
+                if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Look LUT generation failed"); }
+                const blob = await response.blob(); const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a"); anchor.href = url; anchor.download = lookTitle.trim().replace(/[^a-z0-9_-]+/gi, "_") + "_" + lutSize + "pt.cube"; anchor.click(); URL.revokeObjectURL(url);
+                setLookNote("Look LUT generated. It expects the declared linear RGB input space; create/validate camera and display transforms separately.");
+              } catch (err) { setLookNote(err instanceof Error ? err.message : "Look LUT generation failed"); }
+              finally { setLookBusy(false); }
+            }}>{lookBusy ? "Baking LUT…" : "Generate Look LUT"}</button>
+          </div>
+          {lookNote && <div className="lut-export-note">{lookNote}</div>}
+          <div className="look-warning">Temperature and Tint are artistic RGB gain offsets, not Kelvin-based white-balance controls. Master curve support exists in the engine API; an interactive curve editor is a subsequent UI task.</div>
+        </section>
         <section className="card lut-export-card">
           <div className="card-heading"><div><span className="section-kicker">LOOK DELIVERY</span><h2>3D LUT Export</h2></div><span className="subtle-tag">.CUBE · 3D GRID</span></div>
           <p className="lut-export-description">Import a developed .cube look and resample it for delivery. The engine preserves the source LUT domain and evaluates its transform at the selected grid density.</p>
