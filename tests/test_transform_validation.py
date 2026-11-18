@@ -96,6 +96,23 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
         apply_reference_validated_transform(_frame(), passed, **kwargs)
 
 
+
+def test_apply_rejects_encoded_output_even_with_passing_fixture(tmp_path):
+    config = tmp_path / "config.ocio"
+    config.write_text("config-v1")
+    result = _validate(config)
+    with pytest.raises(TransformValidationError, match="scene-linear"):
+        apply_reference_validated_transform(
+            _frame(), result,
+            source_space="OCIO Camera Log",
+            destination_space="Linear DaVinci WideGamut",
+            config_path=config,
+            output_transfer="DaVinci Intermediate",
+            output_primaries="DaVinci Wide Gamut",
+            profile_id="test.camera.profile",
+        )
+
+
 def test_apply_marks_frame_validated_only_after_matching_evidence(tmp_path, monkeypatch):
     config = tmp_path / "config.ocio"
     config.write_text("config-v1")
@@ -186,7 +203,7 @@ def test_registry_driven_prepare_applies_only_complete_approved_profile(tmp_path
         "ocio_source_space": "OCIO Camera Log",
         "ocio_destination_space": "Linear DaVinci WideGamut",
         "output_transfer": "Linear",
-        "output_primaries": "Linear DaVinci WideGamut",
+        "output_primaries": "DaVinci Wide Gamut",
         "validation": validation,
     }
     registry = ProfileRegistry([profile])
@@ -219,7 +236,7 @@ def test_registry_driven_prepare_rejects_profile_evidence_from_other_config(tmp_
         "ocio_source_space": "OCIO Camera Log",
         "ocio_destination_space": "Linear DaVinci WideGamut",
         "output_transfer": "Linear",
-        "output_primaries": "Linear DaVinci WideGamut",
+        "output_primaries": "DaVinci Wide Gamut",
         "validation": validation,
     }
     registry = ProfileRegistry([profile])
