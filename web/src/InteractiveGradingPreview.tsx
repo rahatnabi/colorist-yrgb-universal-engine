@@ -12,6 +12,10 @@ export type InteractivePreviewAnalysis = {
   };
 };
 
+function formatMeasurement(value: number | null | undefined, digits = 4) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
 type Props = {
   sourceUrl: string;
   filename: string;
@@ -312,10 +316,10 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       {measurementResult && <>
         <div className="native-measurement-score">
           <div><small>CORRECTION ACCURACY</small><b>{measurementResult.correction_accuracy.score === null ? "NOT SCORED" : measurementResult.correction_accuracy.score.toFixed(1) + "%"}</b></div>
-          <div><small>EXPOSURE DEVIATION</small><b>{measurementResult.correction_accuracy.exposure.metrics[0]?.deviation === null ? "—" : measurementResult.correction_accuracy.exposure.metrics[0]?.deviation.toFixed(3) + " stops"}</b></div>
+          <div><small>EXPOSURE DEVIATION</small><b>{formatMeasurement(measurementResult.correction_accuracy.exposure.metrics[0]?.deviation, 3) + " stops"}</b></div>
         </div>
         <div className="native-measurement-wb">
-          {measurementResult.correction_accuracy.white_balance.metrics.map(metric => <div key={metric.name}><small>{metric.name.toUpperCase()}</small><b>{metric.measured === null ? "—" : metric.measured.toFixed(4)}</b></div>)}
+          {measurementResult.correction_accuracy.white_balance.metrics.map(metric => <div key={metric.name}><small>{metric.name.toUpperCase()}</small><b>{formatMeasurement(metric.measured)}</b></div>)}
         </div>
         <div className="native-scope-summary">
           <b>NATIVE SCOPE SIGNAL</b>
