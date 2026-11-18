@@ -22,9 +22,11 @@ def test_reference_tonal_curve_exact_match_is_integrated_into_correction_score()
     levels = [0.01, 0.03, 0.07, 0.18, 0.32, 0.55, 0.85]
     baseline = measure_reference_tonal_curve(frame(neutral_pixels(levels)), ReferenceTonalCurve(tuple([0.01, 0.03, 0.07, 0.18, 0.32, 0.55, 0.85])))
     reference = ReferenceTonalCurve(baseline.candidate_luminance, tolerance_stops=0.1)
+    import math
+    exposure_target = math.log2((sum(levels) / len(levels)) / 0.18)
     result = measure_correction_accuracy(
         frame(neutral_pixels(levels)), PixelRegion(0, 0, 7, 1),
-        AccuracyTarget(reference_tonal_curve=reference),
+        AccuracyTarget(exposure_stops=exposure_target, reference_tonal_curve=reference),
     )
     curve = result.measurement.reference_tonal_curve
     assert curve is not None
@@ -44,7 +46,7 @@ def test_reference_curve_detects_one_stop_tonal_shift():
     reference = ReferenceTonalCurve(baseline.candidate_luminance, tolerance_stops=0.1)
     result = measure_correction_accuracy(
         frame(neutral_pixels(candidate_levels)), PixelRegion(0, 0, 7, 1),
-        AccuracyTarget(reference_tonal_curve=reference),
+        AccuracyTarget(exposure_stops=math.log2((sum(candidate_levels) / len(candidate_levels)) / 0.18), reference_tonal_curve=reference),
     )
     assert result.measurement.reference_tonal_curve is not None
     assert result.measurement.reference_tonal_curve.deviation_stops == pytest.approx((1.0,) * 7, abs=1e-5)
