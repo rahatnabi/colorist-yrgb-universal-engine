@@ -473,7 +473,7 @@ export default function App() {
           <div className="card-heading"><div><span className="section-kicker">SEQUENCE INTELLIGENCE</span><h2>Still Image Batch Analysis</h2></div><FileImage size={18} className="muted-icon" /></div>
           <p className="lut-export-description">Compare a bounded sequence of still images. Each image is decoded and measured independently; adjacent RGB mean differences remain sample-domain diagnostics, not exposure matching.</p>
           <div className="batch-controls">
-            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { setBatchFiles(Array.from(event.target.files || []).slice(0, 24)); setBatchResult(null); setBatchNote(""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
+            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { const selected = Array.from(event.target.files || []); setBatchFiles(selected.slice(0, 24)); setCompareA(0); setCompareB(Math.min(1, selected.length - 1)); setBatchResult(null); setBatchNote(selected.length > 24 ? "Only the first 24 images were kept. The batch limit is 24." : ""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
             <button type="button" className="primary-button" disabled={!apiOnline || batchBusy || batchFiles.length === 0 || batchFiles.length > 24} onClick={async () => {
               setBatchBusy(true); setBatchResult(null); setBatchNote("Analyzing image sequence…");
               try {
