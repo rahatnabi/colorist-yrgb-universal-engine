@@ -1088,3 +1088,97 @@ def test_native_measurements_blocks_unverified_profile():
     )
     assert response.status_code == 409
     assert "not reference-validated" in response.json()["detail"]
+
+
+def test_native_grade_export_returns_full_resolution_float32_master(tmp_path, monkeypatch):
+    import hashlib
+    from pathlib import Path
+    from types import SimpleNamespace
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "pinned-export.ocio"
+    config.write_text("export-pinned-config")
+    profile_id = "test.export.camera"
+    transform_id = "test.export.transform"
+    source_space = "Export Camera Log"
+    working_space = "Linear DaVinci WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id, "manufacturer": "Test", "encoding": "Test Log",
+        "gamut": "Test Gamut", "status": "verified", "transform_id": transform_id,
+        "ocio_source_space": source_space, "ocio_destination_space": working_space,
+        "output_transfer": "Linear", "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True, "profile_id": profile_id, "transform_id": transform_id,
+            "source_space": source_space, "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-export-reference", "vector_count": 12,
+            "max_absolute_error": 0.00001, "tolerance": 0.0001, "ocio_version": "test",
+        },
+    }])
+    source = PrecisionFrame.from_interleaved(
+        width=2, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6, 1.5, -0.1, 2.0),
+        source_path="fixture", decoder="test", encoding=ColorEncoding(),
+    )
+    graded = PrecisionFrame.from_interleaved(
+        width=2, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6, 1.5, -0.1, 2.0),
+        source_path="fixture", decoder="test",
+        encoding=ColorEncoding(
+            primaries="DaVinci Wide Gamut", transfer="Linear",
+            profile_id=profile_id, validated=True,
+            working_space_id=working_space, transform_id=transform_id,
+        ),
+        sample_domain="validated_linear_native_grade_float32",
+        purpose="graded_still_candidate",
+    )
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", lambda _path: source)
+    monkeypatch.setattr(
+        "yrgb_engine.grading_pipeline.process_validated_still",
+        lambda *_args, **_kwargs: SimpleNamespace(graded_frame=graded),
+    )
+    monkeypatch.setattr(
+        "yrgb_engine.native_export.save_native_float_image",
+        lambda _frame, path: Path(path).write_bytes(b"float32-master-fixture") or Path(path),
+    )
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-grade-export",
+        data={"profile_id": profile_id, "export_format": "exr"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.content == b"float32-master-fixture"
+    assert response.headers["x-yrgb-export-scope"] == "full-resolution"
+    assert response.headers["x-yrgb-sample-format"] == "float32"
+    assert response.headers["x-yrgb-sample-domain"] == "validated-scene-linear"
+    assert response.headers["x-yrgb-clamped"] == "false"
+    assert response.headers["x-yrgb-frame-width"] == "2"
+    assert response.headers["x-yrgb-frame-height"] == "1"
+    assert response.headers["x-yrgb-float-samples-sha256"]
+
+
+def test_native_grade_export_blocks_unverified_camera_profile():
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine", "manufacturer": "Sony",
+        "encoding": "S-Log3", "gamut": "S-Gamut3.Cine",
+        "status": "unverified", "transform_id": None,
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-grade-export",
+        data={"profile_id": "sony.slog3.sgamut3cine", "export_format": "exr"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 409
+    assert "not reference-validated" in response.json()["detail"]
+
+
+def test_native_grade_export_rejects_unsupported_format():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/native-grade-export",
+        data={"profile_id": "missing", "export_format": "png"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 422
