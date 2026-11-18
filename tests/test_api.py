@@ -820,3 +820,33 @@ def test_reference_transform_validation_endpoint_rejects_non_json_manifest(tmp_p
         files={"manifest_file": ("reference.txt", b"{}", "text/plain")},
     )
     assert response.status_code == 415
+
+
+
+def test_native_grade_preview_blocks_unverified_camera_profile():
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine",
+        "manufacturer": "Sony",
+        "encoding": "S-Log3",
+        "gamut": "S-Gamut3.Cine",
+        "status": "unverified",
+        "transform_id": None,
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-grade-preview",
+        data={"profile_id": "sony.slog3.sgamut3cine", "exposure_stops": "1.0"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 409
+    assert "not reference-validated" in response.json()["detail"]
+
+
+def test_native_grade_preview_rejects_unknown_camera_profile():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/native-grade-preview",
+        data={"profile_id": "unknown.profile"},
+        files={"file": ("still.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 404
