@@ -1,0 +1,25 @@
+name: OCIO ACES compatibility
+
+on:
+  push:
+    branches: [feat/media-intelligence-foundation]
+    paths:
+      - "src/yrgb_engine/data/camera_profiles.json"
+      - "src/yrgb_engine/registry.py"
+      - "scripts/check_ocio_candidates.py"
+      - ".github/workflows/ocio-integration.yml"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+jobs:
+  aces-studio-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install OCIO 2.5 and engine
+        run: python -m pip install -e ".[ocio]"
+      - name: Build every mapped camera processor against ACES Studio v4
+        run: python scripts/check_ocio_candidates.py
