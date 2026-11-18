@@ -107,6 +107,110 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Learning exercise not found.")
         return exercise
 
+    @app.get("/v1/learning/assets/neutral-practice-chart.png")
+    async def learning_practice_chart() -> Response:
+        """Download a synthetic practice still, explicitly not a measured reference."""
+        from .practice_assets import neutral_practice_chart_png
+        return Response(
+            content=neutral_practice_chart_png(),
+            media_type="image/png",
+            headers={
+                "Content-Disposition": 'attachment; filename="yrgb-neutral-practice-chart.png"',
+                "X-YRGB-Asset-Status": "synthetic-instructional-sample",
+            },
+        )
+
+    @app.post("/v1/learning/lessons/{lesson_id}/complete")
+    async def complete_learning_lesson(
+        lesson_id: str,
+        learner_id: str = Form(min_length=8, max_length=80),
+    ) -> dict[str, Any]:
+        from .learning import get_lesson
+        from .learning_store import complete_lesson
+        if get_lesson(lesson_id) is None:
+            raise HTTPException(status_code=404, detail="Learning lesson not found.")
+        return complete_lesson(learner_id=learner_id, lesson_id=lesson_id)
+
+    @app.get("/v1/learning/progress")
+    async def learning_progress(
+        learner_id: str = Query(min_length=8, max_length=80),
+    ) -> dict[str, Any]:
+        from .learning_store import get_progress
+        return get_progress(learner_id)
+
+    @app.post("/v1/learning/submissions")
+    async def submit_learning_exercise(
+        exercise_id: str = Form(min_length=1, max_length=80),
+        learner_id: str = Form(min_length=8, max_length=80),
+        evidence: str = Form(min_length=10, max_length=12000),
+        file: UploadFile | None = File(default=None),
+        profile_id: str | None = Form(default=None, max_length=160),
+        roi_x: int | None = Form(default=None, ge=0),
+        roi_y: int | None = Form(default=None, ge=0),
+        roi_width: int | None = Form(default=None, ge=1),
+        roi_height: int | None = Form(default=None, ge=1),
+    ) -> dict[str, Any]:
+        """Persist a still-image exercise submission without inventing scores."""
+        from .learning import get_exercise
+        from .learning_store import save_submission
+        exercise = get_exercise(exercise_id)
+        if exercise is None:
+            raise HTTPException(status_code=404, detail="Learning exercise not found.")
+        roi_values = (roi_x, roi_y, roi_width, roi_height)
+        if any(value is not None for value in roi_values) and any(value is None for value in roi_values):
+            raise HTTPException(status_code=422, detail="Provide all four ROI values together.")
+        if file is None and exercise["kind"] != "knowledge":
+            raise HTTPException(status_code=422, detail="Attach a still image for this practical exercise.")
+        image_bytes = None
+        filename = None
+        if file is not None:
+            filename = file.filename or "submission-image"
+            suffix = Path(filename).suffix.casefold()
+            allowed_suffixes = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".exr", ".dng", ".dpx", ".webp"}
+            if not (file.content_type or "").startswith("image/") and suffix not in allowed_suffixes:
+                raise HTTPException(status_code=415, detail="Submission must be a supported still-image file.")
+            image_bytes = await file.read(100 * 1024 * 1024 + 1)
+            if not image_bytes or len(image_bytes) > 100 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Still-image submission must be between 1 byte and 100 MiB.")
+        assessment_status = "submitted"
+        if exercise["assessment_mode"] == "correction_accuracy":
+            profile = profile_registry.get_by_id(profile_id) if profile_id else None
+            profile_validated = bool(profile and profile.get("usable_for_transform"))
+            reference_validated = exercise["reference_asset_status"] == "measured_reference"
+            roi_provided = all(value is not None for value in roi_values)
+            assessment_status = (
+                "eligible_for_native_assessment"
+                if profile_validated and reference_validated and roi_provided and image_bytes is not None
+                else "not_scored_reference_or_measurement_validation_missing"
+            )
+        elif exercise["assessment_mode"] == "creative_look_similarity":
+            assessment_status = "awaiting_creative_reference_review"
+        stored = save_submission(
+            learner_id=learner_id,
+            exercise_id=exercise_id,
+            evidence={"text": evidence.strip(), "profile_id": profile_id, "roi": {
+                "x": roi_x, "y": roi_y, "width": roi_width, "height": roi_height,
+            } if roi_x is not None else None},
+            image_bytes=image_bytes,
+            image_filename=filename,
+            assessment_status=assessment_status,
+        )
+        return {
+            "submission": stored,
+            "assessment": {
+                "status": assessment_status,
+                "correction_accuracy_score": None,
+                "note": (
+                    "No objective score was issued. A measured exercise reference, validated camera transform, "
+                    "and verified native measurement are required."
+                    if assessment_status == "not_scored_reference_or_measurement_validation_missing"
+                    else "Submission saved. Creative comparison is a separate review track."
+                    if assessment_status == "awaiting_creative_reference_review"
+                    else "Submission saved for this exercise."
+                ),
+            },
+        }
+
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "service": "colorist-yrgb-engine"}
