@@ -26,6 +26,8 @@ class ColorEncoding:
     profile_id: str | None = None
     metadata_source: str = "unspecified"
     validated: bool = False
+    working_space_id: str | None = None
+    transform_id: str | None = None
 
 
 @dataclass(slots=True)
