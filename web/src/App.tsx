@@ -16,6 +16,11 @@ type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_inde
 type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
 type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
+type AlignmentComparison = {
+  reference_filename: string; candidate_filename: string;
+  alignment: { method: string; reference_size: { width: number; height: number }; candidate_size: { width: number; height: number }; analysis_size: { width: number; height: number }; homography_candidate_to_reference: number[][]; good_matches: number; inliers: number; inlier_ratio: number; overlap_pixels: number; overlap_ratio: number };
+  comparison: { measurement_domain: string; reference_sample_domain: string; candidate_sample_domain: string; sample_domain_match: boolean; comparability: string; channel_metrics: Record<"R" | "G" | "B", { reference_mean: number; candidate_aligned_mean: number; mean_delta_candidate_minus_reference: number; mean_absolute_difference: number; root_mean_square_difference: number }>; note: string };
+};
 type BatchAnalysis = { image_count: number; images: { index: number; filename: string; width: number; height: number; sample_domain: string; channels: Record<string, { mean: number }> }[]; adjacent_comparisons: { from_index: number; to_index: number; channel_mean_delta: Record<string, number>; measurement_domain: string }[]; comparison_note: string };
 
 function formatBytes(bytes: number) {
@@ -86,6 +91,9 @@ export default function App() {
   const [compareA, setCompareA] = useState(0);
   const [compareB, setCompareB] = useState(1);
   const [compareTarget, setCompareTarget] = useState<"A" | "B">("A");
+  const [alignmentResult, setAlignmentResult] = useState<AlignmentComparison | null>(null);
+  const [alignmentBusy, setAlignmentBusy] = useState(false);
+  const [alignmentNote, setAlignmentNote] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
@@ -473,7 +481,7 @@ export default function App() {
           <div className="card-heading"><div><span className="section-kicker">SEQUENCE INTELLIGENCE</span><h2>Still Image Batch Analysis</h2></div><FileImage size={18} className="muted-icon" /></div>
           <p className="lut-export-description">Compare a bounded sequence of still images. Each image is decoded and measured independently; adjacent RGB mean differences remain sample-domain diagnostics, not exposure matching.</p>
           <div className="batch-controls">
-            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { const selected = Array.from(event.target.files || []); setBatchFiles(selected.slice(0, 24)); setCompareA(0); setCompareB(Math.min(1, selected.length - 1)); setBatchResult(null); setBatchNote(selected.length > 24 ? "Only the first 24 images were kept. The batch limit is 24." : ""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
+            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { const selected = Array.from(event.target.files || []); setBatchFiles(selected.slice(0, 24)); setCompareA(0); setCompareB(Math.min(1, selected.length - 1)); setBatchResult(null); setAlignmentResult(null); setAlignmentNote(""); setBatchNote(selected.length > 24 ? "Only the first 24 images were kept. The batch limit is 24." : ""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
             <button type="button" className="primary-button" disabled={!apiOnline || batchBusy || batchFiles.length === 0 || batchFiles.length > 24} onClick={async () => {
               setBatchBusy(true); setBatchResult(null); setBatchNote("Analyzing image sequence…");
               try {
