@@ -74,6 +74,7 @@ export default function App() {
   const [lookTitle, setLookTitle] = useState("COLORIST YRGB Look");
   const [lookSpace, setLookSpace] = useState("scene-linear-rec709");
   const [lookLuma, setLookLuma] = useState([0.2126, 0.7152, 0.0722]);
+  const [lookCurveMid, setLookCurveMid] = useState(0.5);
   const [lookSettings, setLookSettings] = useState({ exposure_stops: 0, contrast: 1, pivot: 0.18, saturation: 1, temperature_shift: 0, tint_shift: 0 });
   const [lookNote, setLookNote] = useState("");
   const [lookBusy, setLookBusy] = useState(false);
@@ -275,6 +276,7 @@ export default function App() {
               <input type="range" min={min} max={max} step={step} value={lookSettings[key]} onChange={e => setLookSettings(current => ({ ...current, [key]: Number(e.target.value) }))} />
             </label>)}
           </div>
+          <label className="look-slider look-master-curve"><span>MASTER CURVE MIDPOINT <b>{lookCurveMid.toFixed(2)}</b></span><input type="range" min="0.1" max="0.9" step="0.01" value={lookCurveMid} onChange={e => setLookCurveMid(Number(e.target.value))} /></label>
           <div className="look-export-row">
             <span>Export resolution: <b>{lutSize} Point</b></span>
             <button type="button" className="primary-button" disabled={!apiOnline || lookBusy || !lookTitle.trim() || !lookSpace.trim()} onClick={async () => {
@@ -282,7 +284,7 @@ export default function App() {
               try {
                 const response = await fetch(API_BASE + "/v1/look/export-cube", {
                   method: "POST", headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ size: Number(lutSize), title: lookTitle, input_space_id: lookSpace, input_transfer: "scene-linear", settings: { ...lookSettings, luminance_coefficients: lookLuma } }),
+                  body: JSON.stringify({ size: Number(lutSize), title: lookTitle, input_space_id: lookSpace, input_transfer: "scene-linear", settings: { ...lookSettings, luminance_coefficients: lookLuma, master_curve: [[0, 0], [0.5, lookCurveMid], [1, 1]] } }),
                 });
                 if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "Look LUT generation failed"); }
                 const blob = await response.blob(); const url = URL.createObjectURL(blob);
