@@ -42,6 +42,13 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
   }, [nativePreviewUrl]);
 
   useEffect(() => {
+    setNativePreviewUrl("");
+    setNativeStatus(profileId
+      ? "Grade controls changed · render again to refresh the native result."
+      : "Select a reference-validated camera profile to enable native rendering.");
+  }, [sourceUrl, profileId, cameraModel, settings, curveMidpoint]);
+
+  useEffect(() => {
     if (!sourceUrl) {
       sourceCanvasRef.current = null;
       setDimensions(null);
