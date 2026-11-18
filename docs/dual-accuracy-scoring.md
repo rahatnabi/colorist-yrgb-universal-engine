@@ -58,3 +58,17 @@ This remains a separate future implementation. It requires validated color-manag
 ## Explicit non-goals
 
 No video or temporal scoring, no universal aesthetic score, no inferred gray card/skin ROI, and no score based on unverified decoded RGB.
+
+## 4. Compact Correction Accuracy Report
+
+The engine exposes a compact report model in `yrgb_engine.correction_report` via `build_correction_accuracy_report(result, target)`. It groups the existing image-derived measurements without changing their measurement domains or the established weighted headline score.
+
+The report contains:
+
+- **Exposure** — measured ROI exposure in stops, exercise target, absolute stop deviation and component score.
+- **White Balance** — separate Red, Green and Blue neutral-ROI ratios, per-channel targets, absolute deviations and channel scores; a transparent section mean is shown as a diagnostic.
+- **Reference Tonal Curve** — P1/P10/P25/P50/P75/P90/P99 candidate and reference linear-luminance values, absolute stop deviation and per-anchor score; a transparent section mean is shown as a diagnostic.
+
+The headline Correction Accuracy score remains the existing exercise-weighted score from the scoring engine. Section means are diagnostic summaries only and are not re-aggregated into the headline. If no reference curve is supplied, that section is explicitly `not_scored`; no reference values or score are fabricated. The report also carries the validated working-space and transform identifiers, sample count and limitations.
+
+The report is a backend data contract at this milestone, not a claim that an upload UI can score arbitrary decoded images. The current upload decoder remains uncharacterized, so an explicitly validated linear-light frame and exercise-authored ROI/targets are still prerequisites.
