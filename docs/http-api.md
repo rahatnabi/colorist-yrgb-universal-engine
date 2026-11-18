@@ -29,6 +29,14 @@ OpenAPI documentation is available at `/docs` while the server is running.
   Measurements remain in the decoder's sample domain; no camera transform, IRE,
   luminance, waveform or vectorscope interpretation is inferred. Install the
   `high-precision` extra to enable this endpoint.
+- `POST /v1/media/video-frame?timestamp_seconds=2.5` — decode one frame from a
+  video at the requested timestamp using FFmpeg and return the same channel
+  statistics, histogram and RGB parade data. Timestamp must be between 0 and
+  86,400 seconds. Uploads are limited to 512 MiB and decoded frames to 40 MP.
+  Install FFmpeg and NumPy. Source transfer, primaries, matrix and range metadata
+  are retained; no Log-to-working-space transform, IRE scale or calibrated
+  luminance interpretation is applied. This is single-frame analysis, not yet a
+  real-time playback or temporal-scope stream.
 
 ## Important boundaries
 
