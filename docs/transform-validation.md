@@ -80,7 +80,7 @@ The registry now records candidate OCIO color-space names aligned with the Acade
 - RED Log3G10 / REDWideGamutRGB
 - Blackmagic Film Gen 5 / Blackmagic Wide Gamut
 - Apple Log
-- DJI D-Log / D-Gamut (candidate source-space mapping; verify exact name in pinned Studio config)
+- DJI D-Log / D-Gamut (`D-Log D-Gamut` source space; OCIO processor compatibility confirmed, reference validation pending)
 
 The candidate destination is DaVinci Intermediate WideGamut, with declared DaVinci Intermediate transfer and DaVinci Wide Gamut primaries. These names are intended for an explicitly pinned, compatible upstream OCIO config; the engine does not silently download or substitute a config. The ACES config is an upstream transform implementation, not by itself independent camera reference measurements. Therefore every mapped profile still reports mapped_unvalidated and remains blocked from automatic conversion until its exact config hash and independent reference-vector set pass.
 
