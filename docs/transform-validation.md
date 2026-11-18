@@ -37,3 +37,16 @@ A passing result exposes `to_registry_record()`. The returned audit fields can b
 - a positive reference-vector count.
 
 The web profile discovery panel displays whether a profile has independent reference-validation evidence. It does not provide a button to self-certify a profile. Registry catalogue entries remain unverified until real reference sets are added and reviewed.
+
+
+## Expanded camera profile catalogue
+
+The candidate registry now includes:
+- Insta360 Luna Ultra / Luna Pro: I-Log with Rec.2020 input gamut.
+- Insta360 X5 / X6: separate 10-bit I-Log / BT.2020 candidate. This is intentionally not merged with the Luna-series I-Log curve.
+- DJI D-Log / D-Gamut, kept separate from D-Log M and D-Log2.
+- Nikon N-Log / N-Gamut.
+- RED Log3G12 / REDWideGamutRGB, kept separate from the existing Log3G10 entry.
+- Blackmagic Pocket Cinema Camera 4K and 6K family: separate Gen 4 and Gen 5 candidates, tied to explicit camera-model lists.
+
+These are catalogue entries, not validated conversion transforms. Every new/updated entry remains `unverified` and cannot drive a transform until independent reference vectors, a pinned OCIO configuration, and a passing validation record are supplied. Camera mode, codec, firmware, and RAW decode metadata may still affect the correct interpretation. In particular, never apply a Luna I-Log curve to X-series I-Log simply because the display label is similar.
