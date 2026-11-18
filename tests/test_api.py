@@ -265,3 +265,32 @@ def test_linear_look_exr_endpoint_requires_linear_confirmation(monkeypatch):
     )
     assert response.status_code == 422
     assert "Confirm" in response.json()["detail"]
+
+
+def test_transform_preview_blocks_unverified_camera_profile(monkeypatch):
+    registry = ProfileRegistry([{
+        "id": "sony.slog3.sgamut3cine",
+        "manufacturer": "Sony",
+        "encoding": "S-Log3",
+        "gamut": "S-Gamut3.Cine",
+        "status": "unverified",
+        "transform_id": None,
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/transform-preview",
+        data={"profile_id": "sony.slog3.sgamut3cine"},
+        files={"file": ("frame.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 409
+    assert "not reference-validated" in response.json()["detail"]
+
+
+def test_transform_preview_rejects_unknown_camera_profile():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/transform-preview",
+        data={"profile_id": "unknown.profile"},
+        files={"file": ("frame.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 404
