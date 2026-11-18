@@ -22,6 +22,7 @@ api = ["fastapi>=0.115", "python-multipart>=0.0.9", "uvicorn>=0.30"]
 
 [project.scripts]
 yrgb-probe = "yrgb_engine.cli:main"
+yrgb-validate-transform = "yrgb_engine.validation_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
