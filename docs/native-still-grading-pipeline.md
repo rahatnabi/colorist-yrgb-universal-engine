@@ -47,3 +47,8 @@ selected by the caller.
 - Display preview conversion is not a mastering-output certification.
 - The native path is CPU-based through OpenImageIO and OpenColorIO; performance
   profiling and tiled/streamed processing remain follow-up work.
+
+
+## Interactive grading preview endpoint
+
+`POST /v1/media/native-grade-preview` is the still-image API entry point for the native path. It accepts the still upload, an exact registered profile ID, an optional exact camera model, and exposure/contrast/pivot/saturation/temperature/tint/master-curve controls. The endpoint delegates processing to `process_validated_still()` so API grading uses the same validated float32 look implementation as native callers. It returns a display PNG preview only; it does not create a delivery master. Unverified profiles are rejected before decoding.
