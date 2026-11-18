@@ -15,17 +15,27 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function ScopePanel({ title, subtitle, icon, histogram, raster }: { title: string; subtitle: string; icon: React.ReactNode; histogram?: ScopeHistogram; raster?: ScopeRaster }) {
-  const hasSignal = !!histogram || !!raster;
+function ScopePanel({ title, subtitle, icon, histogram, parades }: { title: string; subtitle: string; icon: React.ReactNode; histogram?: ScopeHistogram; parades?: Record<string, ScopeRaster> }) {
+  const channels = ["R", "G", "B"] as const;
+  const hasParade = !!parades && channels.every(channel => !!parades[channel]);
+  const hasSignal = !!histogram || hasParade;
   const maxCount = histogram ? Math.max(1, ...histogram.counts) : 1;
   return <section className="scope-panel">
     <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
-    <div className="scope-screen"><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
+    <div className={"scope-screen" + (hasParade ? " rgb-parade-screen" : "")}><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
       {histogram ? <div className="histogram-bars">{histogram.counts.map((count, index) => <i key={index} style={{ height: (Math.max(1, count / maxCount * 100)) + "%" }} />)}</div>
-      : raster ? <svg className="raster-scope" viewBox={"0 0 " + raster.width + " " + raster.height} preserveAspectRatio="none">{raster.counts.flatMap((column, x) => column.map((count, y) => count > 0 ? <rect key={x + "-" + y} x={x} y={y} width="1" height="1" opacity={Math.min(1, 0.18 + count / 8)} /> : null))}</svg>
+      : hasParade ? <div className="rgb-parade-bands">{channels.map(channel => {
+        const raster = parades[channel];
+        return <div className={"parade-band parade-" + channel.toLowerCase()} key={channel}>
+          <span className="parade-channel-label">{channel}</span>
+          <svg viewBox={"0 0 " + raster.width + " " + raster.height} preserveAspectRatio="none" role="img" aria-label={channel + " channel parade"}>
+            {raster.counts.flatMap((column, x) => column.map((count, y) => count > 0 ? <rect key={x + "-" + y} x={x} y={y} width="1" height="1" opacity={Math.min(1, 0.18 + count / 8)} /> : null))}
+          </svg>
+        </div>;
+      })}</div>
       : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
     </div>
-    <div className="scope-foot">{subtitle}{histogram ? " · under/over: " + histogram.underflow + "/" + histogram.overflow : raster ? " · under/over: " + raster.underflow + "/" + raster.overflow : ""}</div>
+    <div className="scope-foot">{subtitle}{histogram ? " · under/over: " + histogram.underflow + "/" + histogram.overflow : hasParade ? " · R/G/B channels · source range under/over: " + channels.map(channel => parades[channel].underflow + "/" + parades[channel].overflow).join(" · ") : ""}</div>
   </section>;
 }
 
@@ -181,7 +191,7 @@ export default function App() {
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
           <ScopePanel title="Waveform" subtitle="Luma / RGB · explicit coefficients required" icon={<Activity size={15} />} />
-          <ScopePanel title="R Channel Parade" subtitle="Decoded source values" icon={<AudioWaveform size={15} />} raster={analysis?.analysis.rgb_parade.R} />
+          <ScopePanel title="RGB Parade" subtitle="Separate R / G / B channel density · decoded source values" icon={<AudioWaveform size={15} />} parades={analysis?.analysis.rgb_parade} />
           <ScopePanel title="Histogram" subtitle="R channel · 128 bins · code-value range 0–1" icon={<Gauge size={15} />} histogram={analysis?.analysis.histograms.R} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
