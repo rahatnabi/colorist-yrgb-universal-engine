@@ -530,6 +530,10 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         interval_seconds: float = Query(default=1.0, gt=0.0, le=60.0),
         frame_count: int = Query(default=8, ge=1, le=24),
         shot_change_threshold: float | None = Query(default=0.35, ge=0.0, le=1.0),
+        roi_x: float = Query(default=0.25, ge=0.0, le=1.0),
+        roi_y: float = Query(default=0.25, ge=0.0, le=1.0),
+        roi_width: float = Query(default=0.5, gt=0.0, le=1.0),
+        roi_height: float = Query(default=0.5, gt=0.0, le=1.0),
     ) -> dict[str, Any]:
         """Analyze a bounded set of evenly spaced video frames.
 
@@ -557,12 +561,19 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
 
             if start_seconds + (frame_count - 1) * interval_seconds > 86400.0:
                 raise HTTPException(status_code=422, detail="Requested sample timestamps exceed the 86400-second limit.")
+            if roi_x + roi_width > 1.0 or roi_y + roi_height > 1.0:
+                raise HTTPException(status_code=422, detail="ROI rectangle must remain inside normalized frame bounds.")
 
             def analyze_sample() -> dict[str, Any]:
+                from .roi import measure_normalized_rgb_roi
+                roi_measurements = []
                 def decoded_frames():
                     for index in range(frame_count):
                         timestamp = start_seconds + index * interval_seconds
                         frame = decode_video_float_frame(temporary_path, timestamp_seconds=timestamp)
+                        roi_measurements.append(measure_normalized_rgb_roi(
+                            frame, x=roi_x, y=roi_y, width=roi_width, height=roi_height
+                        ))
                         yield timestamp, frame
 
                 reports = iter_analyze_video_frames(
@@ -585,6 +596,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                         "mean_luminance_delta": report.mean_luminance_delta,
                         "shot_change_candidate": report.shot_change_candidate,
                         "channels": {key: asdict(value) for key, value in report.analysis.channels.items()},
+                        "roi_measurement": roi_measurements[report.frame_index],
                     })
                 from .shot_consistency import ShotFrameSignal, group_sampled_shots
 
@@ -628,6 +640,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 "start_seconds": start_seconds,
                 "interval_seconds": interval_seconds,
                 "shot_change_threshold": shot_change_threshold,
+                "roi": {"x": roi_x, "y": roi_y, "width": roi_width, "height": roi_height, "coordinate_space": "normalized"},
                 "sample_domain": "source sample-domain; no input transform applied",
                 "frames": frames,
                 "shot_groups": shot_groups,
