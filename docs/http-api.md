@@ -125,3 +125,16 @@ transfer metadata. Its output header explicitly reports
 `X-YRGB-Transform-Validated: false`: operator confirmation is not independent
 colorimetric validation. It does not convert camera Log, apply DWG/Intermediate
 or generate Rec.709 output. Install the `high-precision` extra to enable it.
+
+
+## Reference-gated still transform preview
+
+`POST /v1/media/transform-preview` accepts a still-image upload and an explicit `profile_id` form field. It only runs when that exact registry profile has verified status, a matching independent reference-validation record, a pinned OCIO config hash, and explicit source/destination space metadata.
+
+Server configuration:
+- `YRGB_OCIO_CONFIG`: absolute path to the server-managed pinned OCIO config.
+- `YRGB_PREVIEW_SPACE`: exact OCIO display/preview destination space name.
+- `YRGB_PREVIEW_TRANSFER`: transfer declaration for the preview destination.
+- `YRGB_PREVIEW_PRIMARIES`: primaries declaration for the preview destination.
+
+The response is a PNG preview with headers identifying the selected camera profile, camera-transform validation status, and preview-only status. The display transform is explicitly **not** certified as a mastering/export transform. The current public camera catalogue contains unverified profiles, so those profiles correctly receive HTTP 409 until independent reference data is added and reviewed. The endpoint never infers a camera profile from a filename.
