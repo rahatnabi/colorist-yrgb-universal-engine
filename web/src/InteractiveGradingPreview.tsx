@@ -277,11 +277,11 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
 
     <div className="native-measurements-panel">
       <div className="native-measurements-heading"><b>NATIVE SCOPE & CORRECTION MEASUREMENTS</b><span>VALIDATED LINEAR FRAME</span></div>
-      <p>Choose a neutral reference ROI in the original still. Coordinates are full-resolution source pixels, not the resized browser preview.</p>
+      <p>Choose a neutral reference ROI in the original still. Coordinates are full-resolution source pixels, not the resized browser preview. Minimum sample area: 16 pixels; the initial 1 × 1 values are placeholders, not a selected gray reference.</p>
       <div className="native-roi-grid">
         {(["x", "y", "width", "height"] as const).map(key => <label key={key}>{key.toUpperCase()}<input type="number" min={key === "width" || key === "height" ? 1 : 0} step="1" value={roi[key]} onChange={event => setRoi(current => ({ ...current, [key]: Math.max(0, Math.floor(Number(event.target.value) || 0)) }))} /></label>)}
       </div>
-      <button type="button" className="preview-export-button" disabled={!sourceFile || !profileId || measurementBusy} onClick={runNativeMeasurements}>
+      <button type="button" className="preview-export-button" disabled={!sourceFile || !profileId || measurementBusy || roi.width * roi.height < 16} onClick={runNativeMeasurements}>
         {measurementBusy ? "MEASURING NATIVE FRAME…" : "MEASURE NATIVE GRADE"}
       </button>
       <span className="native-measurement-status">{measurementStatus}</span>
