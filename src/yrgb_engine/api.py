@@ -14,7 +14,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from .capabilities import capabilities_as_dict
 from .probe import probe_media
-from .registry import ProfileRegistry, ProfileRegistryError
+from .registry import ProfileRegistry
 
 MAX_UPLOAD_BYTES = 512 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
