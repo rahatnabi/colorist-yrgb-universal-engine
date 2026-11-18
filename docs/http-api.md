@@ -138,3 +138,6 @@ Server configuration:
 - `YRGB_PREVIEW_PRIMARIES`: primaries declaration for the preview destination.
 
 The response is a PNG preview with headers identifying the selected camera profile, camera-transform validation status, and preview-only status. The display transform is explicitly **not** certified as a mastering/export transform. The current public camera catalogue contains unverified profiles, so those profiles correctly receive HTTP 409 until independent reference data is added and reviewed. The endpoint never infers a camera profile from a filename.
+
+
+POST /v1/media/video-transform-preview?timestamp_seconds=... performs the same reference-gated camera-to-working-space preparation on one FFmpeg-decoded video frame, then renders a preview-only PNG. It uses the same explicit profile_id and server-managed OCIO/preview environment settings. The returned timestamp header identifies the sampled frame. This is not continuous playback or video delivery.
