@@ -40,13 +40,13 @@
       "capture_metadata": {
         "camera_make": "Sony",
         "camera_model": "ILME-FX30",
-        "recording_mode": "XAVC S-I 4K 4:2:2; exact recording mode string pending original XML",
+        "recording_mode": "Sony AVC140_3840_2160_H422P@L51 (reported; XAVC S Long GOP vs XAVC S-I classification unresolved)",
         "firmware": null,
-        "codec": "AVC/H.264 (Sony XAVC S-I)",
+        "codec": "AVC/H.264 (user-reported)",
         "codec_profile": "High 4:2:2 Profile @ Level 5.1 (reported)",
         "pixel_format": null,
         "bit_depth": null,
-        "chroma_subsampling": "4:2:2",
+        "chroma_subsampling": "4:2:2 (reported)",
         "width": 3840,
         "height": 2160,
         "frame_rate": "25/1 fps (25.00p)",
@@ -59,13 +59,30 @@
       "notes": [
         "Camera and recording details are transcribed from the user's summary of the Sony XML metadata; original XML and MP4 bytes have not been acquired or independently parsed.",
         "10-bit is expected for the reported XAVC S-I 4:2:2 mode but remains unverified; pixel format and range are unknown.",
-        "User-reported clip duration is 324 frames (12.96 s at 25 fps); start timecode 12364108.",
         "Lens reported: Tamron E 17-70mm F2.8 B070. Audio reported: 2-channel LPCM16.",
         "Suggested monitoring LUT reported: SL3SG3Ctos709.cube; LUT has not been acquired or validated.",
         "S-Log3 and S-Gamut3.Cine are retained as user-supplied metadata claims, not independently verified transforms.",
         "Original bytes, checksums, embedded metadata, and XML sidecar contents remain pending acquisition.",
-        "No redistribution permission has been established; do not publish or redistribute."
-      ]
+        "No redistribution permission has been established; do not publish or redistribute.",
+        "Clip-specific user transcription: duration 192 frames (7.68 s at 25 fps); creation 2026-04-29T03:05:59+06:00; start timecode 00:12:47:08; reported end timecode 16:19:47:08. Original XML bytes are still required to verify these fields.",
+        "Reported 10-bit video, 4:2:2 chroma, and 2-channel LPCM 16-bit audio; stream-level pixel format, bit depth, codec/GOP mode, and audio stream details remain unverified.",
+        "The supplied codec string AVC140_3840_2160_H422P@L51 is recorded verbatim. The accompanying XAVC S Long GOP label conflicts with the earlier XAVC S-I summary; exact recording mode must be resolved from original XML and ffprobe.",
+        "UMID reference supplied as truncated value 060A2B34...45AE7D for both clips; not sufficient to establish unique full UMIDs.",
+        "Reported start/end timecodes appear inconsistent with the stated short clip durations; preserve verbatim and verify against original XML/timecode track before using for frame-accurate synchronization."
+      ],
+      "clip_metadata": {
+        "creation_datetime": "2026-04-29T03:05:59+06:00",
+        "duration_frames": 192,
+        "duration_seconds": 7.68,
+        "start_timecode": "00:12:47:08",
+        "end_timecode": "16:19:47:08",
+        "umid_reference": "060A2B34...45AE7D",
+        "lens": "Tamron E 17-70mm F2.8 Di III-A VC RXD (E 17-70mm F2.8 B070)",
+        "reported_bit_depth": 10,
+        "audio_codec": "LPCM 16-bit",
+        "audio_channels": 2,
+        "metadata_verification": "user_transcribed"
+      }
     },
     {
       "asset_id": "sony-slog3cine-c1383",
@@ -106,13 +123,13 @@
       "capture_metadata": {
         "camera_make": "Sony",
         "camera_model": "ILME-FX30",
-        "recording_mode": "XAVC S-I 4K 4:2:2; exact recording mode string pending original XML",
+        "recording_mode": "Sony AVC140_3840_2160_H422P@L51 (reported; XAVC S Long GOP vs XAVC S-I classification unresolved)",
         "firmware": null,
-        "codec": "AVC/H.264 (Sony XAVC S-I)",
+        "codec": "AVC/H.264 (user-reported)",
         "codec_profile": "High 4:2:2 Profile @ Level 5.1 (reported)",
         "pixel_format": null,
         "bit_depth": null,
-        "chroma_subsampling": "4:2:2",
+        "chroma_subsampling": "4:2:2 (reported)",
         "width": 3840,
         "height": 2160,
         "frame_rate": "25/1 fps (25.00p)",
@@ -125,13 +142,30 @@
       "notes": [
         "Camera and recording details are transcribed from the user's summary of the Sony XML metadata; original XML and MP4 bytes have not been acquired or independently parsed.",
         "10-bit is expected for the reported XAVC S-I 4:2:2 mode but remains unverified; pixel format and range are unknown.",
-        "User-reported clip duration is 324 frames (12.96 s at 25 fps); start timecode 12364108.",
         "Lens reported: Tamron E 17-70mm F2.8 B070. Audio reported: 2-channel LPCM16.",
         "Suggested monitoring LUT reported: SL3SG3Ctos709.cube; LUT has not been acquired or validated.",
         "S-Log3 and S-Gamut3.Cine are retained as user-supplied metadata claims, not independently verified transforms.",
         "Original bytes, checksums, embedded metadata, and XML sidecar contents remain pending acquisition.",
-        "No redistribution permission has been established; do not publish or redistribute."
-      ]
+        "No redistribution permission has been established; do not publish or redistribute.",
+        "Clip-specific user transcription: duration 228 frames (9.12 s at 25 fps); creation 2026-04-29T03:06:45+06:00; start timecode 17:19:47:08; reported end timecode 19:28:47:08. Original XML bytes are still required to verify these fields.",
+        "Reported 10-bit video, 4:2:2 chroma, and 2-channel LPCM 16-bit audio; stream-level pixel format, bit depth, codec/GOP mode, and audio stream details remain unverified.",
+        "The supplied codec string AVC140_3840_2160_H422P@L51 is recorded verbatim. The accompanying XAVC S Long GOP label conflicts with the earlier XAVC S-I summary; exact recording mode must be resolved from original XML and ffprobe.",
+        "UMID reference supplied as truncated value 060A2B34...45AE7D for both clips; not sufficient to establish unique full UMIDs.",
+        "Reported start/end timecodes appear inconsistent with the stated short clip durations; preserve verbatim and verify against original XML/timecode track before using for frame-accurate synchronization."
+      ],
+      "clip_metadata": {
+        "creation_datetime": "2026-04-29T03:06:45+06:00",
+        "duration_frames": 228,
+        "duration_seconds": 9.12,
+        "start_timecode": "17:19:47:08",
+        "end_timecode": "19:28:47:08",
+        "umid_reference": "060A2B34...45AE7D",
+        "lens": "Tamron E 17-70mm F2.8 Di III-A VC RXD (E 17-70mm F2.8 B070)",
+        "reported_bit_depth": 10,
+        "audio_codec": "LPCM 16-bit",
+        "audio_channels": 2,
+        "metadata_verification": "user_transcribed"
+      }
     }
   ]
 }
