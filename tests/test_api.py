@@ -62,7 +62,6 @@ def test_probe_accepts_unknown_file_as_unknown_not_supported():
 
 
 def test_analyze_returns_real_sample_domain_histogram_and_parade(monkeypatch):
-    from array import array
     from yrgb_engine.precision import PrecisionFrame
 
     def fake_decode(_path):
