@@ -309,7 +309,9 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       const width = response.headers.get("X-YRGB-Frame-Width") || "?";
       const height = response.headers.get("X-YRGB-Frame-Height") || "?";
       const digest = response.headers.get("X-YRGB-Float-Samples-SHA256") || "not supplied";
-      setMasterStatus("Full-resolution float32 " + masterFormat.toUpperCase() + " exported · " + width + " × " + height + " · unclamped · sample SHA-256 " + digest.slice(0, 16) + "…");
+      const roundtripVerified = response.headers.get("X-YRGB-Roundtrip-Verified") === "true";
+      const roundtripError = response.headers.get("X-YRGB-Roundtrip-Max-Absolute-Error") || "unknown";
+      setMasterStatus("Full-resolution float32 " + masterFormat.toUpperCase() + " exported · " + width + " × " + height + " · unclamped · round-trip " + (roundtripVerified ? "VERIFIED" : "status unavailable") + " · max error " + roundtripError + " · sample SHA-256 " + digest.slice(0, 16) + "…");
     } catch (error) {
       setMasterStatus(error instanceof Error ? error.message : "Native master export failed.");
     } finally {
