@@ -84,16 +84,29 @@ class ProfileRegistry:
         has_validation = (
             isinstance(validation, dict)
             and validation.get("passed") is True
+            and validation.get("profile_id") == record.get("id")
+            and validation.get("transform_id") == record.get("transform_id")
             and isinstance(validation.get("config_sha256"), str)
             and len(validation["config_sha256"]) == 64
             and isinstance(validation.get("reference_set_id"), str)
             and bool(validation["reference_set_id"].strip())
             and isinstance(validation.get("vector_count"), int)
+            and not isinstance(validation.get("vector_count"), bool)
             and validation["vector_count"] > 0
+            and isinstance(validation.get("source_space"), str)
+            and bool(validation["source_space"].strip())
+            and isinstance(validation.get("destination_space"), str)
+            and bool(validation["destination_space"].strip())
+            and validation.get("source_space") == record.get("ocio_source_space")
+            and validation.get("destination_space") == record.get("ocio_destination_space")
         )
         usable = (
             record.get("status") == "verified"
             and bool(record.get("transform_id"))
+            and bool(record.get("ocio_source_space"))
+            and bool(record.get("ocio_destination_space"))
+            and bool(record.get("output_transfer"))
+            and bool(record.get("output_primaries"))
             and has_validation
         )
         record["usable_for_transform"] = usable
