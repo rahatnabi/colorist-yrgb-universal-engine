@@ -67,3 +67,20 @@ Do not substitute Apple Log for Apple Log 2 or vice versa. Preserve transfer-fun
 ## Current implementation boundary
 
 The registry-driven preparation function is implemented and covered by synthetic unit tests. Those tests prove identity matching, config pinning, and fail-closed behavior; they do not validate any real camera transform. The current production catalogue still contains no approved camera-to-DWG/Intermediate transforms, so real media conversion correctly remains blocked until independent reference sets and approved OCIO configurations are supplied. DWG/Intermediate is not tagged as scene-linear; linear-light exposure tools must use a separate validated linear transform.
+
+
+## Upstream OCIO transform candidates
+
+The registry now records candidate OCIO color-space names aligned with the AcademySoftwareFoundation OpenColorIO-Config-ACES v4.0.0 release (ACES 2.0 / OCIO 2.5) for these families:
+
+- Sony S-Log3 / S-Gamut3 and S-Gamut3.Cine
+- ARRI LogC3 (EI800) and LogC4
+- Canon Log3 / Cinema Gamut
+- Panasonic V-Log / V-Gamut
+- RED Log3G10 / REDWideGamutRGB
+- Blackmagic Film Gen 5 / Blackmagic Wide Gamut
+- Apple Log
+
+The candidate destination is DaVinci Intermediate WideGamut, with declared DaVinci Intermediate transfer and DaVinci Wide Gamut primaries. These names are intended for an explicitly pinned, compatible upstream OCIO config; the engine does not silently download or substitute a config. The ACES config is an upstream transform implementation, not by itself independent camera reference measurements. Therefore every mapped profile still reports mapped_unvalidated and remains blocked from automatic conversion until its exact config hash and independent reference-vector set pass.
+
+Profiles not represented by this upstream mapping (including the current Insta360 I-Log variants, DJI D-Log, Nikon N-Log, RED Log3G12, and Blackmagic Gen 4) remain mapping-unavailable until an exact, documented transform source is identified.
