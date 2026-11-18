@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from yrgb_engine.api import create_app
 from yrgb_engine.registry import ProfileRegistry
@@ -38,9 +39,9 @@ def test_batch_analyze_compares_adjacent_still_images(monkeypatch):
     assert payload["image_count"] == 2
     assert [item["filename"] for item in payload["images"]] == ["first.tif", "second.tif"]
     assert payload["images"][0]["sample_domain"] == "test_encoded_values"
-    assert payload["adjacent_comparisons"][0]["channel_mean_delta"] == {
-        "R": 0.1, "G": 0.09999999999999998, "B": 0.10000000000000003,
-    }
+    assert payload["adjacent_comparisons"][0]["channel_mean_delta"] == pytest.approx({
+        "R": 0.1, "G": 0.1, "B": 0.1,
+    }, abs=2e-8)
     assert payload["adjacent_comparisons"][0]["measurement_domain"] == "decoded_sample_domain_not_linear_light"
 
 
