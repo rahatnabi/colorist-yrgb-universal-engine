@@ -5,12 +5,14 @@ claim that preview decodes or unverified camera profiles are grading-ready.
 """
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
 
 from .capabilities import capabilities_as_dict
 from .probe import probe_media
@@ -31,6 +33,18 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         ),
     )
     profile_registry = registry or ProfileRegistry.load()
+    allowed_origins = [
+        origin.strip()
+        for origin in os.getenv("YRGB_CORS_ORIGINS", "http://localhost:5173").split(",")
+        if origin.strip()
+    ]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
 
     @app.get("/health")
     async def health() -> dict[str, str]:
