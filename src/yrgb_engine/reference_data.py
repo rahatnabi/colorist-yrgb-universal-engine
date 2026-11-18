@@ -38,7 +38,7 @@ def load_reference_manifest(path: str | Path) -> dict[str, Any]:
         payload = json.loads(
             Path(path).read_text(encoding="utf-8"),
             parse_constant=lambda value: (_ for _ in ()).throw(
-                ValueError(f"Invalid JSON numeric constant: {value}")
+                ValueError(f"Non-finite JSON numeric constant: {value}")
             ),
         )
     except (OSError, json.JSONDecodeError, ValueError) as exc:
