@@ -98,6 +98,64 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         except (TypeError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    @app.post("/v1/transforms/validate-reference")
+    async def validate_transform_reference(
+        manifest_file: UploadFile = File(...),
+        tolerance: float = Query(default=1e-5, gt=0, le=0.01),
+    ) -> dict[str, Any]:
+        """Validate one camera candidate against uploaded traceable measured vectors.
+
+        A passing report is audit evidence only: it never edits or promotes the
+        bundled camera registry. Production approval remains an explicit review.
+        """
+        from .reference_data import ReferenceManifestError, validate_reference_manifest
+
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        if not config_value or not Path(config_value).is_file():
+            await manifest_file.close()
+            raise HTTPException(
+                status_code=503,
+                detail="A pinned server-managed YRGB_OCIO_CONFIG file is required for transform validation.",
+            )
+
+        filename = Path(manifest_file.filename or "reference.json").name
+        if Path(filename).suffix.lower() != ".json":
+            await manifest_file.close()
+            raise HTTPException(status_code=415, detail="Upload a JSON reference-vector manifest.")
+        temporary_path: str | None = None
+        try:
+            raw = await manifest_file.read(1_048_577)
+            if len(raw) > 1_048_576:
+                raise HTTPException(status_code=413, detail="Reference manifest exceeds the 1 MiB limit.")
+            if not raw:
+                raise HTTPException(status_code=400, detail="Reference manifest is empty.")
+            with tempfile.NamedTemporaryFile(prefix="yrgb-reference-", suffix=".json", delete=False) as temp:
+                temporary_path = temp.name
+                temp.write(raw)
+            try:
+                result = await run_in_threadpool(
+                    validate_reference_manifest,
+                    temporary_path,
+                    config_path=config_value,
+                    registry=profile_registry,
+                    tolerance=tolerance,
+                )
+            except ReferenceManifestError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            return {
+                **result.to_registry_record(),
+                "promotion_status": "not_promoted",
+                "next_step": (
+                    "Passing reference evidence must be reviewed and explicitly added to the "
+                    "camera registry; this endpoint never changes profile status."
+                ),
+            }
+        finally:
+            await manifest_file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
     @app.get("/v1/ocio/status")
     async def ocio_config_status() -> dict[str, Any]:
         """Report exact OCIO config availability without applying any transforms."""
