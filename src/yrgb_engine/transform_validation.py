@@ -39,6 +39,21 @@ class TransformValidationResult:
     passed: bool
     ocio_version: str
 
+    def to_registry_record(self) -> dict[str, object]:
+        """Return the auditable validation fields expected by ProfileRegistry."""
+        return {
+            "passed": self.passed,
+            "config_sha256": self.config_sha256,
+            "reference_set_id": self.reference_set_id,
+            "vector_count": self.vector_count,
+            "max_absolute_error": self.max_absolute_error,
+            "tolerance": self.tolerance,
+            "ocio_version": self.ocio_version,
+            "source_space": self.source_space,
+            "destination_space": self.destination_space,
+            "transform_id": self.transform_id,
+        }
+
 
 def validate_reference_vectors(
     *,
