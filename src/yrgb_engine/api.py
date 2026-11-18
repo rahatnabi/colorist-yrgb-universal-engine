@@ -584,6 +584,20 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                         raise HTTPException(status_code=503, detail=message) from exc
                     raise HTTPException(status_code=422, detail=message) from exc
                 means = {name: measurement["channels"][name]["mean"] for name in ("R", "G", "B")}
+                tile_means = []
+                for tile_y in range(2):
+                    for tile_x in range(2):
+                        tile_measurement = await run_in_threadpool(
+                            measure_normalized_rgb_roi, frame,
+                            x=roi_x + roi_width * tile_x / 2,
+                            y=roi_y + roi_height * tile_y / 2,
+                            width=roi_width / 2,
+                            height=roi_height / 2,
+                        )
+                        tile_means.append({
+                            name: tile_measurement["channels"][name]["mean"]
+                            for name in ("R", "G", "B")
+                        })
                 measured_samples.append({
                     "timestamp_seconds": timestamp,
                     "frame_index": sample_index,
@@ -591,6 +605,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     "measurement_domain": measurement["measurement_domain"],
                     "reference_validated_transform": False,
                     "roi_mean": means,
+                    "tile_means": tile_means,
                 })
                 sample_reports.append({
                     "sample_index": sample_index,
@@ -627,7 +642,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 "samples": sample_reports,
                 "limitations": [
                     "ROI is fixed in image coordinates and does not track a moving subject.",
-                    "Dense sampling does not prove periodic flicker; this endpoint does not estimate flicker frequency.",
+                    "Two-by-two tile spectral coherence is supporting evidence only; no optical-flow motion compensation is performed.",
+                    "Periodic spectral peaks and RGB mean-step boundaries are candidates, not confirmed flicker or scene cuts.",
                     "Exposure stops are unavailable because no reference-validated scene-linear transform is applied.",
                     "Source frame indices and timecode are not independently resolved from timestamps.",
                 ],

@@ -42,3 +42,26 @@ endpoint does not apply a reference-validated scene-linear transform.
 ROI coordinates are fixed in image space. They do not follow moving subjects.
 The upload limit remains the service-wide bounded upload limit, and the
 sampling count is capped at 240 to limit decode work.
+
+
+## Periodic variation and scene-boundary candidates
+
+The dense analyzer removes a fitted linear trend, applies a Hann window, and
+evaluates an FFT peak in the 1 Hz to min(30 Hz, Nyquist) band when at least 32
+regular samples are available. A peak is surfaced as a
+`periodic_variation_candidate` only when its peak-to-median spectral-floor
+ratio is at least 6 and relative modulation amplitude is at least 0.2%.
+This is a decoder-sample-domain candidate, not a confirmed flicker diagnosis
+or identification of mains frequency.
+
+The endpoint also measures a fixed 2×2 set of ROI tiles. Agreement of spectral
+peaks across tiles is reported as spatial coherence. This is supporting
+evidence only: it is not optical flow, subject tracking, or motion compensation.
+Camera motion, moving content, rolling shutter, exposure control, compression,
+and mixed lighting can still create or mask periodic signals.
+
+Large adjacent RGB ROI mean steps are emitted as scene-boundary candidates.
+They are not confirmed cuts and should be cross-checked with existing frame
+histogram diagnostics. No exposure-stop result is enabled for nonlinear
+decoder RGB. The implementation deliberately avoids calling this
+motion-compensated flicker detection.

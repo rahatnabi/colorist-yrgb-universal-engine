@@ -15,6 +15,41 @@ class DenseTemporalError(ValueError):
     """Raised when dense temporal samples are malformed."""
 
 
+
+def _spectral_peak(values: list[float], sample_rate: float) -> dict[str, float] | None:
+    """Return a conservative detrended Hann-window spectral peak summary."""
+    import numpy as np
+    signal = np.asarray(values, dtype=np.float64)
+    if signal.size < 32 or not np.all(np.isfinite(signal)) or float(np.mean(np.abs(signal))) <= 1e-12:
+        return None
+    time = np.arange(signal.size, dtype=np.float64)
+    slope, intercept = np.polyfit(time, signal, 1)
+    residual = signal - (slope * time + intercept)
+    residual -= float(np.mean(residual))
+    window = np.hanning(signal.size)
+    spectrum = np.abs(np.fft.rfft(residual * window))
+    frequencies = np.fft.rfftfreq(signal.size, d=1.0 / sample_rate)
+    upper = min(30.0, sample_rate / 2.0)
+    eligible = (frequencies >= 1.0) & (frequencies <= upper)
+    if int(np.count_nonzero(eligible)) < 3:
+        return None
+    indices = np.flatnonzero(eligible)
+    peak_index = int(indices[int(np.argmax(spectrum[eligible]))])
+    peak = float(spectrum[peak_index])
+    floor = float(np.median(spectrum[eligible]))
+    amplitude = 2.0 * peak / max(float(np.sum(window)), 1e-12)
+    baseline = max(float(np.mean(np.abs(signal))), 1e-9)
+    return {
+        "frequency_hz": float(frequencies[peak_index]),
+        "peak_to_median_spectral_floor": peak / max(floor, 1e-12),
+        "relative_modulation_amplitude": amplitude / baseline,
+    }
+
+
+def _luminance(rgb: dict[str, float], coefficients: tuple[float, float, float]) -> float:
+    return sum(rgb[key] * coefficient for key, coefficient in zip(("R", "G", "B"), coefficients, strict=True))
+
+
 def analyze_dense_roi_samples(
     samples: list[dict[str, Any]],
     *,
@@ -65,7 +100,19 @@ def analyze_dense_roi_samples(
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value):
                 raise DenseTemporalError(f"Sample {index} has invalid {channel} mean.")
             rgb.append(float(value))
-        normalized.append((float(timestamp), frame_index, tuple(rgb)))
+        tile_means = sample.get("tile_means")
+        if tile_means is not None:
+            if not isinstance(tile_means, list) or len(tile_means) != 4:
+                raise DenseTemporalError(f"Sample {index} tile_means must contain exactly four tile RGB means.")
+            for tile in tile_means:
+                if not isinstance(tile, dict) or any(
+                    isinstance(tile.get(channel), bool)
+                    or not isinstance(tile.get(channel), (int, float))
+                    or not isfinite(tile[channel])
+                    for channel in ("R", "G", "B")
+                ):
+                    raise DenseTemporalError(f"Sample {index} contains invalid tile RGB means.")
+        normalized.append((float(timestamp), frame_index, tuple(rgb), tile_means))
         previous_time, previous_frame = float(timestamp), frame_index
         transform_validated = transform_validated and validated
 
@@ -90,15 +137,74 @@ def analyze_dense_roi_samples(
     linear_evidence = domain == "linear_light_rgb" and transform_validated
     luminance = [
         sum(channel * coefficient for channel, coefficient in zip(rgb, luminance_coefficients, strict=True))
-        for _, _, rgb in normalized
+        for _, _, rgb, _ in normalized
     ]
     positive = all(value > 0 for value in luminance)
     first_last_stops = log2(luminance[-1] / luminance[0]) if len(luminance) > 1 and positive else None
 
     flicker = {
         "status": "inconclusive",
-        "reason": "Dense samples alone do not establish periodic flicker; frequency-domain and motion/scene controls are still required.",
+        "reason": "ROI mean periodicity is a candidate only; spatial coherence cannot rule out camera motion or moving content.",
     }
+    scene_boundaries = []
+    for index in range(1, len(normalized)):
+        before = normalized[index - 1][2]
+        after = normalized[index][2]
+        scale = max(sum(abs(v) for v in before) / 3.0, 0.05)
+        distance = sum(abs(after[c] - before[c]) for c in range(3)) / (3.0 * scale)
+        if distance >= 0.25:
+            scene_boundaries.append({
+                "sample_index": index,
+                "timestamp_seconds": normalized[index][0],
+                "relative_rgb_mean_step": distance,
+                "status": "boundary_candidate",
+            })
+
+    frequency_analysis = {"status": "unavailable", "reason": "Requires at least 32 dense, regular samples."}
+    spatial_coherence = {"status": "unavailable", "reason": "Four-tile ROI measurements were not supplied."}
+    if dense_sampling and len(normalized) >= 32:
+        sample_rate = 1.0 / median_interval
+        signal = [
+            _luminance({"R": rgb[0], "G": rgb[1], "B": rgb[2]}, luminance_coefficients)
+            for _, _, rgb, _ in normalized
+        ]
+        peak = _spectral_peak(signal, sample_rate)
+        if peak is None:
+            frequency_analysis = {"status": "inconclusive", "reason": "No stable non-zero spectral signal in the supported frequency band."}
+        else:
+            candidate = peak["peak_to_median_spectral_floor"] >= 6.0 and peak["relative_modulation_amplitude"] >= 0.002
+            frequency_analysis = {
+                "status": "periodic_variation_candidate" if candidate else "no_strong_periodic_peak",
+                **peak,
+                "supported_band_hz": [1.0, min(30.0, sample_rate / 2.0)],
+                "interpretation": "Decoder-sample-domain periodic candidate; not a confirmed lighting flicker diagnosis.",
+            }
+            if all(item[3] is not None for item in normalized):
+                tile_peaks = []
+                for tile_index in range(4):
+                    tile_signal = [
+                        _luminance(item[3][tile_index], luminance_coefficients)
+                        for item in normalized
+                    ]
+                    tile_peaks.append(_spectral_peak(tile_signal, sample_rate))
+                coherent = [
+                    item for item in tile_peaks if item is not None
+                    and abs(item["frequency_hz"] - peak["frequency_hz"]) <= max(0.5, sample_rate / len(normalized))
+                    and item["peak_to_median_spectral_floor"] >= 4.0
+                ]
+                spatial_coherence = {
+                    "status": "reported",
+                    "coherent_tile_count": len(coherent),
+                    "tile_count": 4,
+                    "coherence_fraction": len(coherent) / 4.0,
+                    "interpretation": "Spatial coherence supports an illumination-change hypothesis but does not compensate for motion or prove flicker.",
+                }
+            flicker = {
+                "status": "candidate" if candidate else "inconclusive",
+                "reason": "A periodic ROI mean signal was found; spatial coherence and current diagnostics cannot confirm a lighting source.",
+                "frequency_analysis": frequency_analysis,
+                "spatial_coherence": spatial_coherence,
+            }
     if not dense_sampling:
         flicker = {
             "status": "unavailable",
@@ -128,10 +234,14 @@ def analyze_dense_roi_samples(
         "dense_sampling": dense_sampling,
         "luminance_coefficients": list(luminance_coefficients),
         "flicker_assessment": flicker,
+        "frequency_analysis": frequency_analysis,
+        "spatial_coherence": spatial_coherence,
+        "scene_boundary_candidates": scene_boundaries,
         "exposure_drift_assessment": exposure,
         "limitations": [
             "ROI means cannot distinguish illumination changes from moving content inside the ROI.",
-            "Flicker frequency and confidence are not estimated by this foundation.",
+            "Frequency peaks are candidates only; no optical-flow motion compensation or lighting-source identification is performed.",
+            "Scene boundaries are RGB mean-step candidates, not confirmed cuts.",
             "Exposure drift is reported only as first-to-last scene-linear ROI luminance delta in stops.",
         ],
     }

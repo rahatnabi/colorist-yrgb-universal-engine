@@ -63,3 +63,32 @@ def test_timestamps_and_frame_indices_must_increase():
 def test_invalid_coefficients_are_rejected():
     with pytest.raises(DenseTemporalError, match="summing to 1"):
         analyze_dense_roi_samples(samples(), expected_interval_seconds=1/25, luminance_coefficients=(1, 1, 1))
+
+
+def test_periodic_roi_signal_produces_frequency_candidate_not_confirmed_flicker():
+    import math
+    data = samples(count=128, domain="nonlinear_rgb_code_values", validated=False)
+    for item in data:
+        value = 0.4 + 0.02 * math.sin(2 * math.pi * 5 * item["timestamp_seconds"])
+        item["roi_mean"] = {"R": value, "G": value, "B": value}
+        item["tile_means"] = [{"R": value, "G": value, "B": value} for _ in range(4)]
+    result = analyze_dense_roi_samples(data, expected_interval_seconds=1 / 25)
+    assert result["frequency_analysis"]["status"] == "periodic_variation_candidate"
+    assert result["frequency_analysis"]["frequency_hz"] == pytest.approx(5.0, abs=0.3)
+    assert result["flicker_assessment"]["status"] == "candidate"
+    assert result["spatial_coherence"]["coherence_fraction"] == 1.0
+
+
+def test_abrupt_rgb_mean_step_is_reported_as_scene_boundary_candidate():
+    data = samples(count=40, domain="nonlinear_rgb_code_values", validated=False)
+    for item in data[20:]:
+        item["roi_mean"] = {"R": 0.9, "G": 0.9, "B": 0.9}
+    result = analyze_dense_roi_samples(data, expected_interval_seconds=1 / 25)
+    assert any(item["sample_index"] == 20 for item in result["scene_boundary_candidates"])
+
+
+def test_invalid_tile_measurements_are_rejected():
+    data = samples(count=40)
+    data[4]["tile_means"] = [{"R": 0.1, "G": 0.2, "B": 0.3}]
+    with pytest.raises(DenseTemporalError, match="exactly four"):
+        analyze_dense_roi_samples(data, expected_interval_seconds=1 / 25)
