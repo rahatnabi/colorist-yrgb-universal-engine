@@ -1,6 +1,6 @@
 # COLORIST YRGB — Footage Library (Milestone 2)
 
-Status: **library foundation started; first user-supplied Sony S-Log3/S-Gamut3.Cine intake is pending byte-level access and metadata verification.**
+Status: **library foundation and non-destructive intake tooling implemented; first user-supplied Sony S-Log3/S-Gamut3.Cine intake remains registered but pending original-byte access and metadata verification.**
 
 ## Purpose
 
@@ -30,9 +30,29 @@ footage-library/
   proxies/                # generated review copies; never replace originals
   frame-stills/           # extracted frames with source timecode/frame index
   reference-data/         # measured chart patches and validation vectors
-  exercises/               # learner-ready copies with license clearance
-  reports/                 # probe, decode, color, and QC reports
+  exercises/              # learner-ready copies with license clearance
+  reports/                # probe, decode, color, and QC reports
 ```
+
+## Non-destructive intake reporter
+
+The new `scripts/footage_intake.py` utility hashes supplied files with SHA-256, reports byte sizes, parses XML leaf values/attributes without assigning undocumented vendor meanings, and invokes the existing media probe for non-XML files. It never modifies or copies the source files.
+
+After installing the project dependencies, run:
+
+```bash
+python scripts/footage_intake.py /path/to/C1382.MP4 /path/to/C1382M01.XML \
+  /path/to/C1383.MP4 /path/to/C1383M01.XML \
+  --output reports/sony-slog3-intake.json
+```
+
+For a hash + XML-only pass without ffprobe:
+
+```bash
+python scripts/footage_intake.py /path/to/C1382M01.XML --skip-probe
+```
+
+The report records each file independently. A video may report `probe_unavailable`, `probe_failed`, or `probe_timeout`; these are explicit states, not evidence that the file is corrupt. Preserve the original report and tool versions with the dataset.
 
 ## Intake pipeline
 
