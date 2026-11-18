@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "policy": "GitHub-hosted resources are pinned and provenance-tracked. Upstream transforms/configs establish implementation compatibility only; they do not independently validate camera-to-working-space accuracy.",
+  "resources": [
+    {
+      "id": "aces-ocio-v4-studio",
+      "kind": "ocio-config",
+      "repository": "AcademySoftwareFoundation/OpenColorIO-Config-ACES",
+      "release": "v4.0.0",
+      "asset": "studio-config-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "url": "https://github.com/AcademySoftwareFoundation/OpenColorIO-Config-ACES/releases/download/v4.0.0/studio-config-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "sha256": "eda5b0008a43b72b98ad540e32eb0eb83b340dde54e35bddba64ccbafac1029a",
+      "size_bytes": 71755,
+      "license": "BSD-3-Clause (upstream repository LICENSE)",
+      "use": "Pinned OCIO 2.5 / ACES 2.0 transform config; fetch with scripts/fetch_aces_config.py.",
+      "validation_scope": "Processor availability and color-space compatibility only; not camera reference validation."
+    },
+    {
+      "id": "aces-ocio-v4-studio-all-views",
+      "kind": "ocio-config",
+      "repository": "AcademySoftwareFoundation/OpenColorIO-Config-ACES",
+      "release": "v4.0.0",
+      "asset": "studio-config-all-views-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "url": "https://github.com/AcademySoftwareFoundation/OpenColorIO-Config-ACES/releases/download/v4.0.0/studio-config-all-views-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "sha256": "0f19d42caab7213be71decd92edd802e67df737b438471013819b01b23238e9d",
+      "size_bytes": 93402,
+      "license": "BSD-3-Clause (upstream repository LICENSE)",
+      "use": "Pinned OCIO 2.5 / ACES 2.0 config with all views.",
+      "validation_scope": "Processor availability and color-space compatibility only; not camera reference validation."
+    },
+    {
+      "id": "aces-ocio-v4-reference",
+      "kind": "ocio-config",
+      "repository": "AcademySoftwareFoundation/OpenColorIO-Config-ACES",
+      "release": "v4.0.0",
+      "asset": "reference-config-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "url": "https://github.com/AcademySoftwareFoundation/OpenColorIO-Config-ACES/releases/download/v4.0.0/reference-config-v4.0.0_aces-v2.0_ocio-v2.5.ocio",
+      "sha256": "dc50a0881cb5724e714bc37759a26396e9ab46cfe85934ade708f316dd980f38",
+      "size_bytes": 60578,
+      "license": "BSD-3-Clause (upstream repository LICENSE)",
+      "use": "Reference OCIO 2.5 / ACES 2.0 config.",
+      "validation_scope": "Processor availability and color-space compatibility only; not camera reference validation."
+    },
+    {
+      "id": "ocio-sony-camera-transform-source",
+      "kind": "transform-source-code",
+      "repository": "AcademySoftwareFoundation/OpenColorIO",
+      "revision": "22dd9c4faa0d1b7cfb3d64d1a6e9cb454acc6cfd",
+      "path": "src/OpenColorIO/transforms/builtins/SonyCameras.cpp",
+      "url": "https://github.com/AcademySoftwareFoundation/OpenColorIO/blob/22dd9c4faa0d1b7cfb3d64d1a6e9cb454acc6cfd/src/OpenColorIO/transforms/builtins/SonyCameras.cpp",
+      "license": "BSD-3-Clause",
+      "use": "Independent implementation reference for S-Log3 transfer and separate S-Gamut3 / S-Gamut3.Cine primaries.",
+      "validation_scope": "Implementation cross-check only; not manufacturer-published camera measurements."
+    },
+    {
+      "id": "ocio-clf-test-image",
+      "kind": "software-conformance-fixture",
+      "repository": "AcademySoftwareFoundation/OpenColorIO",
+      "revision": "main",
+      "path": "share/clf/CLF_testImage.exr",
+      "url": "https://github.com/AcademySoftwareFoundation/OpenColorIO/blob/main/share/clf/CLF_testImage.exr",
+      "upstream_blob_sha": "85cf5ab3cf64e8526ed7d7d673fa42169fb9a4c8",
+      "size_bytes": 201806,
+      "license": "Asset-specific license not separately confirmed; do not redistribute until confirmed.",
+      "use": "CLF software-conformance test image sampling the full half-float domain, as described by upstream share/clf/README.md.",
+      "validation_scope": "LUT/CLF numerical behavior only; not camera footage or camera-transform reference vectors."
+    },
+    {
+      "id": "aces-core",
+      "kind": "color-science-source",
+      "repository": "aces-aswf/aces-core",
+      "revision": "main",
+      "url": "https://github.com/aces-aswf/aces-core",
+      "license": "Apache-2.0",
+      "use": "Core ACES CTL functions and color-science implementation reference.",
+      "validation_scope": "Algorithm/source reference; not camera-specific reference captures."
+    }
+  ]
+}\n
