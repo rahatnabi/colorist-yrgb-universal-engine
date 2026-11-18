@@ -207,3 +207,7 @@
 .camera-metadata-panel pre{max-height:220px;overflow:auto;padding:9px;background:#101410;color:#a9b79f;font-size:8px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:900px){.camera-metadata-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.camera-metadata-grid{grid-template-columns:1fr}}
+
+.camera-sidecar-picker{display:flex;flex-direction:column;gap:5px;margin-top:11px;padding:9px;border:1px dashed #49533f;border-radius:4px;color:#c7d1bd;font-size:8px;letter-spacing:.6px}
+.camera-sidecar-picker input{max-width:100%;font-size:9px;color:#9eaa94}
+.camera-sidecar-picker>span{color:#83907b;font-size:8px;letter-spacing:0;line-height:1.5}
