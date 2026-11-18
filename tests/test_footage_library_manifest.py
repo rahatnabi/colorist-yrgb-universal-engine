@@ -37,3 +37,14 @@ def test_two_sony_clips_are_registered_independently_and_not_falsely_verified():
         assert all(item["acquisition_state"] == "pending" for item in asset["files"])
         assert all(item["sha256"] is None for item in asset["files"])
         assert asset["provenance"]["rights_status"] == "unknown"
+        metadata = asset["capture_metadata"]
+        assert metadata["camera_model"] == "ILME-FX30"
+        assert metadata["codec"] == "AVC/H.264 (Sony XAVC S-I)"
+        assert metadata["width"] == 3840 and metadata["height"] == 2160
+        assert metadata["chroma_subsampling"] == "4:2:2"
+        assert metadata["frame_rate"] == "25/1 fps (25.00p)"
+        assert metadata["transfer"] == "S-Log3"
+        assert metadata["primaries"] == "S-Gamut3.Cine"
+        # Bit depth and range remain unknown until the original stream is probed.
+        assert metadata["bit_depth"] is None
+        assert metadata["range"] is None
