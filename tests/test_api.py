@@ -524,3 +524,52 @@ def test_transform_preview_requires_model_for_model_restricted_profile(tmp_path)
     )
     assert response.status_code == 422
     assert "exact supported camera model" in response.json()["detail"]
+
+
+def test_video_report_endpoint_composes_yuv_and_rgb_domains(monkeypatch):
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    class FakeYUVFrame:
+        width = 2
+        height = 1
+        def to_report(self):
+            return {
+                "measurement_domain": "original_yuv_code_values",
+                "timestamp_seconds": 1.5, "pixel_format": "yuv422p10le", "bit_depth": 10,
+                "range_signaling": "tv", "matrix_signaling": "bt709",
+                "transfer_signaling": "bt709", "primaries_signaling": "bt709",
+                "planes": {
+                    "Y": {"minimum_code_value": 64, "maximum_code_value": 940, "mean_code_value": 400.0, "sample_count": 2},
+                    "U": {"minimum_code_value": 512, "maximum_code_value": 513, "mean_code_value": 512.5, "sample_count": 1},
+                    "V": {"minimum_code_value": 510, "maximum_code_value": 511, "mean_code_value": 510.5, "sample_count": 1},
+                },
+            }
+
+    rgb = PrecisionFrame.from_interleaved(
+        width=2, height=1, channel_names=("R", "G", "B"),
+        values=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), source_path="clip.mp4", decoder="mock-ffmpeg",
+        encoding=ColorEncoding(transfer="bt709", primaries="bt709"),
+    )
+    monkeypatch.setattr("yrgb_engine.video_yuv.decode_video_yuv_frame", lambda *_a, **_k: FakeYUVFrame())
+    monkeypatch.setattr("yrgb_engine.video_precision.decode_video_float_frame", lambda *_a, **_k: rgb)
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post(
+        "/v1/media/video-report?timestamp_seconds=1.5&frame_index=38",
+        files={"file": ("clip.mp4", b"mock-original-video", "video/mp4")},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    report = payload["report"]
+    assert payload["frame_index"] == 38
+    assert len(payload["source_sha256"]) == 64
+    assert report["measurement_domains"]["original_yuv_code_values"]["status"] == "reported"
+    assert report["measurement_domains"]["nonlinear_rgb_code_values"]["status"] == "reported"
+    assert report["measurement_domains"]["linear_light_rgb"]["status"] == "unavailable"
+    assert report["reference_validation"]["status"] == "not_validated"
+    assert report["color_metadata"]["resolution_status"] == "unresolved"
+
+
+def test_video_report_endpoint_rejects_empty_upload():
+    client = TestClient(create_app(registry=ProfileRegistry([])))
+    response = client.post("/v1/media/video-report", files={"file": ("empty.mp4", b"", "video/mp4")})
+    assert response.status_code == 400

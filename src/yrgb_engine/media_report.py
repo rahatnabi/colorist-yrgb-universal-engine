@@ -77,7 +77,7 @@ def build_single_frame_measurement_report(
                 "kind": "camera_original",
                 "reference": source_reference,
                 "sha256": source_sha256,
-                "status": "reported" if source_sha256 is None else "verified",
+                "status": "reported",
                 "tool": None,
                 "tool_version": None,
             },
@@ -105,8 +105,8 @@ def build_single_frame_measurement_report(
         },
         "measurement_domains": {
             "original_yuv_code_values": {
-                "status": "verified",
-                "description": "Decoded native planar Y, U and V integer code values.",
+                "status": "reported",
+                "description": "Decoded native planar Y, U and V integer code values; decoder output not independently reference-validated.",
                 "numeric_domain": (
                     f"{yuv_measurement.get('bit_depth')} bit integer code values; "
                     f"pixel format {yuv_measurement.get('pixel_format')}."

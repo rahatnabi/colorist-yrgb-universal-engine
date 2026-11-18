@@ -6,6 +6,7 @@ claim that preview decodes or unverified camera profiles are grading-ready.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import tempfile
 from pathlib import Path
@@ -329,6 +330,73 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
 
+    @app.post("/v1/media/video-report")
+    async def media_video_report(
+        file: UploadFile = File(...),
+        timestamp_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+        frame_index: int = Query(default=0, ge=0),
+    ) -> dict[str, Any]:
+        """Build a domain-separated report for one sampled video frame."""
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-report-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+            from .oiio_decoder import HighPrecisionDecodeError
+            from .video_precision import decode_video_float_frame
+            from .video_yuv import decode_video_yuv_frame
+            from .media_report import build_single_frame_measurement_report
+
+            try:
+                yuv_frame = await run_in_threadpool(decode_video_yuv_frame, temporary_path, timestamp_seconds=timestamp_seconds)
+                rgb_frame = await run_in_threadpool(decode_video_float_frame, temporary_path, timestamp_seconds=timestamp_seconds)
+                yuv_report = await run_in_threadpool(yuv_frame.to_report)
+            except HighPrecisionDecodeError as exc:
+                message = str(exc)
+                if "required" in message.lower() or "install ffmpeg" in message.lower() or "not found on path" in message.lower():
+                    raise HTTPException(status_code=503, detail=message) from exc
+                raise HTTPException(status_code=422, detail=message) from exc
+
+            digest = await run_in_threadpool(lambda: hashlib.sha256(Path(temporary_path).read_bytes()).hexdigest())
+            report = await run_in_threadpool(
+                build_single_frame_measurement_report,
+                asset_id=Path(filename).stem or filename,
+                source_reference=filename,
+                source_sha256=digest,
+                frame_index=frame_index,
+                timestamp_seconds=timestamp_seconds,
+                yuv_measurement=yuv_report,
+                rgb_frame=rgb_frame,
+            )
+            return {
+                "filename": filename, "size_bytes": total, "source_sha256": digest,
+                "frame_index": frame_index, "timestamp_seconds": timestamp_seconds,
+                "dimensions": {"width": yuv_frame.width, "height": yuv_frame.height},
+                "report": report,
+                "notes": [
+                    "SHA-256 identifies uploaded bytes; it does not authenticate camera origin.",
+                    "YUV and RGB are separate decoder outputs, not colorimetric validation.",
+                    "Linear-light RGB and camera transform validation are not claimed.",
+                ],
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
     @app.post("/v1/media/video-sample")
     async def media_video_sample(
         file: UploadFile = File(...),
