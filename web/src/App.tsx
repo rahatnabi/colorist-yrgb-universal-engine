@@ -181,7 +181,7 @@ export default function App() {
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
           <ScopePanel title="Waveform" subtitle="Luma / RGB · explicit coefficients required" icon={<Activity size={15} />} />
-          <ScopePanel title="RGB Parade" subtitle="R channel · decoded source values" icon={<AudioWaveform size={15} />} raster={analysis?.analysis.rgb_parade.R} />
+          <ScopePanel title="R Channel Parade" subtitle="Decoded source values" icon={<AudioWaveform size={15} />} raster={analysis?.analysis.rgb_parade.R} />
           <ScopePanel title="Histogram" subtitle="R channel · 128 bins · code-value range 0–1" icon={<Gauge size={15} />} histogram={analysis?.analysis.histograms.R} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
