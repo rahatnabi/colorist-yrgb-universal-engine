@@ -1,10 +1,16 @@
 """Verify provenance metadata for pinned upstream GitHub resources."""
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
-from scripts.fetch_aces_config import ASSETS
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts/fetch_aces_config.py"
+SPEC = importlib.util.spec_from_file_location("fetch_aces_config", SCRIPT_PATH)
+assert SPEC is not None and SPEC.loader is not None
+FETCH_MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(FETCH_MODULE)
+ASSETS = FETCH_MODULE.ASSETS
 
 ROOT = Path(__file__).resolve().parents[1]
 
