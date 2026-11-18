@@ -68,3 +68,18 @@
 .dense-analysis-results small,.dense-analysis-results p{font-size:9px;color:#899486;line-height:1.5}
 .dense-analysis-results p{grid-column:1/-1;margin:0}
 @media(max-width:620px){.dense-analysis-results{grid-template-columns:1fr}}
+
+
+/* Waveform and vectorscope visualization */
+.scope-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.scope-toolbar label{display:flex;flex-direction:column;gap:5px;color:#899383;font-size:8px;letter-spacing:.9px}
+.scope-toolbar select{min-width:112px;padding:7px 9px;border:1px solid #3b4436;border-radius:5px;background:#111511;color:#dce5d4;font:inherit;font-size:10px;letter-spacing:0}
+.scope-toolbar select:focus{outline:1px solid #9db77d}
+.scope-raster{position:absolute;inset:0;width:100%;height:100%;fill:#b9d28e}
+.vectorscope-plot{position:absolute;width:100%;height:100%;inset:0;overflow:visible}
+.vectorscope-boundary{fill:none;stroke:#56634c;stroke-width:.006}
+.vectorscope-ring{fill:none;stroke:#394337;stroke-width:.004;stroke-dasharray:.012 .012}
+.vectorscope-axis{fill:none;stroke:#303a2e;stroke-width:.003}
+.vectorscope-point{fill:#b8d68d;opacity:.7}
+.scope-method-note{margin-top:10px}
+@media(max-width:620px){.scope-toolbar{width:100%;align-items:stretch}.scope-toolbar label{flex:1}.scope-toolbar select{width:100%}}
