@@ -1,8 +1,11 @@
 """Parametric linear-RGB look development and 3D .cube LUT baking."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from array import array
 from math import isfinite
+
+from .precision import PrecisionFrame
 
 
 class LookDevelopmentError(ValueError):
@@ -141,3 +144,48 @@ def bake_3d_cube(
                 result = apply_look_rgb((r, g, b), settings)
                 lines.append(" ".join(f"{value:.9f}" for value in result))
     return "\n".join(lines) + "\n"
+
+
+def apply_look_to_frame(
+    frame: PrecisionFrame,
+    settings: LookSettings,
+    *,
+    input_space_id: str,
+) -> PrecisionFrame:
+    """Apply look controls to a validated linear RGB frame without changing its space."""
+    validate_look(settings)
+    if not frame.encoding.validated:
+        raise LookDevelopmentError("Frame must have a validated color transform before look processing.")
+    if frame.encoding.transfer.casefold() not in {"linear", "linear-light", "scene-linear"}:
+        raise LookDevelopmentError("Look processing requires validated linear RGB input.")
+    if not input_space_id.strip() or frame.encoding.working_space_id != input_space_id:
+        raise LookDevelopmentError("Frame working-space ID must exactly match the selected look input space.")
+    channel_indices = {name.upper(): index for index, name in enumerate(frame.channel_names)}
+    if not all(name in channel_indices for name in ("R", "G", "B")):
+        raise LookDevelopmentError("Frame must contain named R, G and B channels.")
+    indices = tuple(channel_indices[name] for name in ("R", "G", "B"))
+    output = array("f")
+    for offset in range(0, len(frame.samples), frame.channel_count):
+        pixel = list(frame.samples[offset : offset + frame.channel_count])
+        rgb = tuple(pixel[index] for index in indices)
+        graded = apply_look_rgb(rgb, settings)
+        for index, value in zip(indices, graded):
+            pixel[index] = value
+        output.extend(pixel)
+    encoding = replace(
+        frame.encoding,
+        metadata_source="validated linear RGB look operation",
+        transform_id=f"yrgb-look:{frame.encoding.transform_id or input_space_id}",
+    )
+    return PrecisionFrame(
+        width=frame.width,
+        height=frame.height,
+        channel_names=frame.channel_names,
+        samples=output,
+        source_path=frame.source_path,
+        decoder=frame.decoder,
+        encoding=encoding,
+        sample_domain="validated_linear_rgb_look_output",
+        purpose="grading_candidate",
+        metadata={**frame.metadata, "yrgb_look_applied": True},
+    )
