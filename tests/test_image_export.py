@@ -88,8 +88,13 @@ def test_save_frame_image_png_round_trip(tmp_path):
 
 
 def test_save_frame_image_rejects_unvalidated_output_transform():
+    unvalidated = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.2, 0.4, 0.6), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(working_space_id="test-linear", transfer="linear"),
+    )
     with pytest.raises(ImageExportError, match="validated output transform"):
         save_frame_image(
-            _frame(), "out.png", image_format="PNG",
+            unvalidated, "out.png", image_format="PNG",
             output_space_id="test-linear", output_transfer="linear",
         )
