@@ -1,78 +1,82 @@
-> **Product scope:** COLORIST YRGB is a still-image-only color analysis and grading workspace. Video and temporal workflows are not supported product features. See [Still-image-only product scope](docs/still-image-product-scope.md).
+# COLORIST YRGB — Universal Color Engine
 
-# COLORIST YRGB — UNIVERSAL COLOR ENGINE
+**An interactive still-image color grading school and precision analysis workspace.**
 
-**Image + Video · RAW + LOG · LUT + Color Science**
-
-An extensible color workflow and learning platform for still images and video. The project is designed around a shared, scene-referred color-processing core with separate media-ingest paths.
-
-## Project status
-
-**Foundation stage — media-intelligence and color-analysis core in active development.** Numerical analysis, LUT parsing/application, profile registry, and diagnostic APIs have automated coverage. A production browser grading UI, complete production decoder matrix, full grading/render engine, and export pipeline are not yet implemented.
+> **Product scope:** COLORIST YRGB is for still photographs, rendered still frames, and still-image sequences. Video editing, video grading, temporal analysis, and video export are not product features. Legacy video code may remain temporarily for reproducibility, but it is outside the product roadmap.
 
 ## Product principles
 
-- Support still images and video through dedicated ingest/decode adapters.
-- Treat camera Log as an encoding/profile, not as a file extension.
-- Use explicit, verifiable camera gamut/gamma profiles; never silently guess an unknown transform.
-- Keep decode, color management, analysis, grading, display, and export as separate layers.
-- Prefer open standards and libraries; isolate proprietary camera SDK integrations behind optional adapters.
-- Use proxies for responsive browser video review; preserve a path to high-quality local/server rendering.
-- Make format and camera-profile support testable and versioned.
-
-## Planned architecture
-
-1. Media ingest and validation
-2. Still-image and video decode adapters
-3. Camera / input-profile registry
-4. Color-management layer (OpenColorIO)
-5. Shared image-processing and grading core
-6. Analysis and scopes
-7. LUT import, validation, and application
-8. Preview, export, and QC
-9. Academy lessons, exercises, and assessment
-
-See [Architecture](docs/architecture.md) and [Format support policy](docs/format-support-matrix.md).
-
-## Proposed technology choices
-
-- Python for orchestration and API services
-- C++ for performance-sensitive processing where profiling justifies it
-- FFmpeg / ffprobe for video probing, decode integration, and proxy workflows
-- OpenImageIO for image I/O and image-sequence workflows
-- LibRaw for compatible RAW still-image decoding
-- OpenColorIO for color configuration and transforms
-- FastAPI for the initial service API
-- React / Next.js for the web interface (to be added in a later phase)
-
-These are candidate dependencies, not a claim that every codec or camera format is already supported. Licensing, platform availability, bit depth, metadata fidelity, and build compatibility must be checked before adoption.
+- Grade still images interactively and preserve a path to full-resolution float processing.
+- Treat camera Log as an encoding/profile, never as a file extension or a guess from a filename.
+- Use explicit camera gamut/gamma profiles; never silently guess a source transform.
+- Keep decode, input transform, working-space grading, display preview, scopes, measurement, and master export as separate stages.
+- Prefer fewer, explainable controls and scientifically grounded measurement.
+- Keep **Correction Accuracy** separate from **Creative Look Similarity**. The former evaluates exercise-defined technical targets; the latter compares a creative result against a chosen visual reference.
+- Do not publish numerical objective scores for unvalidated source data.
 
 ## Implemented foundation
 
-- Precision-preserving float32 frame model and explicit color-encoding metadata.
-- Optional still-image, RAW, video-frame, and image-sequence decode adapters.
-- Exact-match camera profile registry with explicit candidate discovery; no automatic profile guessing.
-- OpenColorIO transform adapter and .cube parsing/application reference implementation.
-- Frame histograms, RGB Parade, optional waveform/vectorscope data, and JSON-ready scope snapshots.
-- Exposure, spatial exposure, temporal exposure, color matching, and operator-selected ROI chroma diagnostics.
-- Initial FastAPI service boundary for health, capability discovery, camera-profile candidate lookup, and bounded media probing.
-- Automated tests and CI checks for the implemented numerical contracts.
+- Float32 precision frame model with explicit source encoding and validation metadata.
+- Still-image metadata inspection and optional OpenImageIO float decode.
+- Exact-match camera profile registry and traceable transform-validation workflow.
+- OpenColorIO transform adapter with reference-validation gates.
+- Interactive browser still preview with Exposure, Contrast, Pivot, Saturation, Temperature, Tint and Master Curve controls.
+- Native still grading pipeline using a validated input transform and scene-linear working space.
+- Native scopes and Correction Accuracy API based on the same graded float32 still frame.
+- Full-resolution float32 TIFF and OpenEXR export path with no display-range clamping.
+- Preview/export metadata including working-space identity, transform identity, image dimensions and a float-sample SHA-256 digest.
+- Separate LUT import workflow; LUT files are not treated as image inputs.
 
-These are engine foundations, not a claim that every decoder, camera transform, scope visualization, or real-time workflow is production-ready. Camera profile entries remain unverified until reference transforms and known-value tests are completed.
+These features are an active foundation, not a claim that every camera transform or format is production-certified. Camera profiles remain blocked until their exact capture mode and transform are independently validated with traceable measured reference data. In particular, the Sony FX30 S-Log3/S-Gamut3.Cine candidate remains unverified.
 
-## HTTP API
+## Native master export
 
-Install with `python -m pip install -e ".[dev,api]"` and run `uvicorn yrgb_engine.api:app --reload`. The initial API provides `/health`, `/v1/capabilities`, `/v1/profiles`, `/v1/profiles/candidates`, and `/v1/media/probe`. See [HTTP API](docs/http-api.md) for limits and deployment caveats. The browser grading interface is still planned, not implemented.
+The API endpoint `POST /v1/media/native-grade-export` supports:
+
+- OpenEXR (`.exr`) float32
+- TIFF (`.tif` / `.tiff`) float32
+
+Exports are scene-linear working-space masters, not display-referred Rec.709 viewing files. The native engine does not clamp negative values or highlight headroom above 1.0. See [Native float export](docs/native-float-export.md).
+
+## Native scopes and assessment
+
+The endpoint `POST /v1/media/native-measurements` calculates scopes and Correction Accuracy from one validated native graded still. Scope values are linear working-space samples, not IRE or calibrated nits. Neutral ROI selection is explicit and learner-controlled. See [Native scope and measurement integration](docs/native-scope-measurement-integration.md) and [Dual accuracy scoring](docs/dual-accuracy-scoring.md).
+
+## Transform validation
+
+The endpoint `POST /v1/transforms/validate-reference` accepts traceable measured reference-vector manifests and produces an audit report. A passing audit does not automatically promote a camera profile. See [Camera transform validation workflow](docs/camera-transform-validation-workflow.md).
 
 ## Development
 
-Add features behind tests and explicit capability flags. Do not label a format as supported until a representative fixture passes decode, metadata, color, and export checks. Do not label a camera profile as transform-ready until its exact camera/gamut/encoding combination is independently validated.
+Install the API and development dependencies:
 
-## License
+```bash
+python -m pip install -e ".[dev,api,images,high-precision,ocio]"
+uvicorn yrgb_engine.api:app --reload
+```
 
-License selection is pending. Do not assume this repository grants permission to redistribute third-party SDKs, sample footage, LUTs, or camera profiles.
+Run the frontend in a second terminal:
 
+```bash
+cd web
+npm install
+npm run dev
+```
 
-## Web workspace
+The native float decoder/exporter requires OpenImageIO and NumPy. Actual TIFF/OpenEXR plugin support depends on the server build. Browser preview is a responsive display preview and is not a substitute for the native float master.
 
-The early React/Vite interface is in [`web/`](web/README.md). Run the API with `uvicorn yrgb_engine.api:app --reload`, then in another terminal run `cd web && npm install && npm run dev`. The UI currently supports local browser previews, media metadata probing, and camera-profile candidate discovery. Numerical scope rendering and grading controls are not yet connected.
+## Quality gates
+
+- Run backend tests and frontend TypeScript/Vite build before treating a change as verified.
+- Do not mark a camera transform verified using synthetic fixtures alone.
+- Do not conflate browser sRGB scopes with native linear scopes.
+- Do not conflate Correction Accuracy with Creative Look Similarity.
+- Do not label a format or camera mode supported until representative decode, metadata, color-transform, and export round-trip tests pass.
+- Work on the feature branch until explicitly asked to merge.
+
+## Repository layout
+
+- `src/yrgb_engine/` — Python engine, transforms, grading, scopes, API and export.
+- `web/` — React/Vite interactive grading school interface.
+- `tests/` — numerical, API and integration contract tests.
+- `docs/` — architecture, validation and workflow documentation.
