@@ -483,3 +483,44 @@ def test_video_transform_preview_uses_requested_timestamp_for_approved_profile(t
     assert seen["timestamp"] == 4.25
     assert response.headers["x-yrgb-frame-timestamp"] == "4.25"
     assert response.headers["x-yrgb-preview-only"] == "true"
+
+
+def test_transform_preview_requires_model_for_model_restricted_profile(tmp_path):
+    import hashlib
+
+    config = tmp_path / "pinned.ocio"
+    config.write_text("model-check-config")
+    profile_id = "test.model.restricted"
+    registry = ProfileRegistry([{
+        "id": profile_id,
+        "manufacturer": "Test",
+        "encoding": "Test Log",
+        "gamut": "Test Gamut",
+        "camera_models": ["Test Camera X"],
+        "status": "verified",
+        "transform_id": "test.model.to.working",
+        "ocio_source_space": "Test Camera Log",
+        "ocio_destination_space": "DaVinci Intermediate WideGamut",
+        "output_transfer": "DaVinci Intermediate",
+        "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True,
+            "profile_id": profile_id,
+            "transform_id": "test.model.to.working",
+            "source_space": "Test Camera Log",
+            "destination_space": "DaVinci Intermediate WideGamut",
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "test-model-reference",
+            "vector_count": 8,
+            "max_absolute_error": 0.00001,
+            "tolerance": 0.0001,
+        },
+    }])
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/transform-preview",
+        data={"profile_id": profile_id},
+        files={"file": ("frame.tif", b"fake-image", "image/tiff")},
+    )
+    assert response.status_code == 422
+    assert "exact supported camera model" in response.json()["detail"]
