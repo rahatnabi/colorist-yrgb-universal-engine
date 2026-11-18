@@ -1228,6 +1228,139 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 Path(preview_path).unlink(missing_ok=True)
 
 
+    @app.post("/v1/media/native-grade-preview")
+    async def media_native_grade_preview(
+        file: UploadFile = File(...),
+        profile_id: str = Form(..., min_length=1, max_length=160),
+        camera_model: str | None = Form(default=None, max_length=120),
+        exposure_stops: float = Form(default=0.0, ge=-10.0, le=10.0),
+        contrast: float = Form(default=1.0, ge=0.0, le=3.0),
+        pivot: float = Form(default=0.18, gt=0.0, le=4.0),
+        saturation: float = Form(default=1.0, ge=0.0, le=3.0),
+        temperature_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        tint_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        curve_midpoint: float = Form(default=0.5, ge=0.1, le=0.9),
+    ) -> FileResponse:
+        """Grade one still in native float32 after a reference-validated input transform.
+
+        The returned PNG is a display preview, not a full-resolution float master.
+        """
+        from dataclasses import replace
+        from .native_grading import NativeGradeSettings, NativeGradingError, apply_native_grade
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+        from .ocio import transform_frame
+        from .preview import PreviewRenderError, save_preview_png
+        from .transform_validation import TransformValidationError, prepare_frame_for_working_space
+
+        profile = profile_registry.get_by_id(profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Selected camera profile is not in the registry.")
+        if not profile.get("usable_for_transform"):
+            raise HTTPException(status_code=409, detail="Selected camera profile is not reference-validated; native grading is blocked.")
+        required_models = profile.get("camera_models", [])
+        if required_models and (
+            not camera_model
+            or not any(camera_model.casefold() == model.casefold() for model in required_models)
+        ):
+            raise HTTPException(status_code=422, detail="Select the exact supported camera model for this profile.")
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
+        preview_transfer = os.getenv("YRGB_PREVIEW_TRANSFER", "").strip()
+        preview_primaries = os.getenv("YRGB_PREVIEW_PRIMARIES", "").strip()
+        working_space = str(profile.get("ocio_destination_space", ""))
+        if not all((config_value, preview_space, preview_transfer, preview_primaries, working_space)):
+            raise HTTPException(status_code=503, detail="Configure the pinned OCIO config and preview output settings on the server.")
+
+        filename = Path(file.filename or "still.tif").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        preview_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-native-grade-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds the 512 MiB limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded still image is empty.")
+            try:
+                frame = await run_in_threadpool(decode_oiio_float, temporary_path)
+            except HighPrecisionDecodeError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            if frame.width * frame.height > 40_000_000:
+                raise HTTPException(status_code=413, detail="Decoded still exceeds the 40 megapixel limit.")
+            frame = replace(
+                frame,
+                encoding=replace(frame.encoding, profile_id=profile_id),
+                metadata={**frame.metadata, "yrgb_selected_camera_profile": profile_id},
+            )
+            try:
+                working_frame = await run_in_threadpool(
+                    prepare_frame_for_working_space, frame,
+                    registry=profile_registry, config_path=config_value,
+                )
+                grade = NativeGradeSettings(
+                    exposure_stops=exposure_stops, contrast=contrast, pivot=pivot,
+                    saturation=saturation, temperature_shift=temperature_shift,
+                    tint_shift=tint_shift, curve_midpoint=curve_midpoint,
+                )
+                graded_frame = await run_in_threadpool(
+                    apply_native_grade, working_frame, grade, working_space_id=working_space,
+                )
+                display_frame = await run_in_threadpool(
+                    transform_frame, graded_frame, source_space=working_space,
+                    destination_space=preview_space, config_path=config_value,
+                )
+                display_frame = replace(
+                    display_frame,
+                    encoding=replace(
+                        display_frame.encoding, primaries=preview_primaries,
+                        transfer=preview_transfer, profile_id=preview_space,
+                        working_space_id=preview_space, transform_id=None,
+                        validated=False,
+                        metadata_source="preview-only OCIO display transform; not delivery validated",
+                    ),
+                    metadata={**display_frame.metadata, "yrgb_preview_only": True},
+                )
+            except (TransformValidationError, NativeGradingError) as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"Native still grading failed: {exc}") from exc
+
+            with tempfile.NamedTemporaryFile(prefix="yrgb-native-preview-", suffix=".png", delete=False) as output:
+                preview_path = output.name
+            await run_in_threadpool(
+                save_preview_png, display_frame, preview_path,
+                display_space_id=preview_space, output_transfer=preview_transfer,
+            )
+            response = FileResponse(
+                preview_path, media_type="image/png",
+                filename=f"{Path(filename).stem}_yrgb_native_grade_preview.png",
+                headers={
+                    "X-YRGB-Camera-Transform-Validated": "true",
+                    "X-YRGB-Native-Grade": "float32-linear",
+                    "X-YRGB-Preview-Only": "true",
+                    "X-YRGB-Working-Space": working_space,
+                },
+                background=BackgroundTask(lambda cleanup_path=preview_path: Path(cleanup_path).unlink(missing_ok=True)),
+            )
+            preview_path = None
+            return response
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError, PreviewRenderError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+            if preview_path:
+                Path(preview_path).unlink(missing_ok=True)
+
+
     @app.post("/v1/media/video-transform-preview")
     async def media_video_transform_preview(
         file: UploadFile = File(...),
