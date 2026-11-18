@@ -6,7 +6,7 @@ An extensible color workflow and learning platform for still images and video. T
 
 ## Project status
 
-**Foundation stage — architecture and repository scaffold.** No production decoder, grading engine, or export pipeline is claimed to be implemented yet.
+**Foundation stage — media-intelligence and color-analysis core in active development.** Numerical analysis, LUT parsing/application, profile registry, and diagnostic APIs have automated coverage. A production browser grading UI, complete production decoder matrix, full grading/render engine, and export pipeline are not yet implemented.
 
 ## Product principles
 
@@ -45,9 +45,21 @@ See [Architecture](docs/architecture.md) and [Format support policy](docs/format
 
 These are candidate dependencies, not a claim that every codec or camera format is already supported. Licensing, platform availability, bit depth, metadata fidelity, and build compatibility must be checked before adoption.
 
+## Implemented foundation
+
+- Precision-preserving float32 frame model and explicit color-encoding metadata.
+- Optional still-image, RAW, video-frame, and image-sequence decode adapters.
+- Exact-match camera profile registry with explicit candidate discovery; no automatic profile guessing.
+- OpenColorIO transform adapter and .cube parsing/application reference implementation.
+- Frame histograms, RGB Parade, optional waveform/vectorscope data, and JSON-ready scope snapshots.
+- Exposure, spatial exposure, temporal exposure, color matching, and operator-selected ROI chroma diagnostics.
+- Automated tests and CI checks for the implemented numerical contracts.
+
+These are engine foundations, not a claim that every decoder, camera transform, scope visualization, or real-time workflow is production-ready. Camera profile entries remain unverified until reference transforms and known-value tests are completed.
+
 ## Development
 
-The first milestone is a reliable media-probing and profile-identification foundation. Add features behind tests and explicit capability flags. Do not label a format as supported until a representative fixture passes decode, metadata, color, and export checks.
+Add features behind tests and explicit capability flags. Do not label a format as supported until a representative fixture passes decode, metadata, color, and export checks. Do not label a camera profile as transform-ready until its exact camera/gamut/encoding combination is independently validated.
 
 ## License
 
