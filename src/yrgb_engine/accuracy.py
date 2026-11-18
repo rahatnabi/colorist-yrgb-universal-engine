@@ -1,9 +1,4 @@
-"""Image-derived correction measurements connected to the deterministic score engine.
-
-Only explicitly validated linear-RGB frames are accepted. The exercise must
-supply the ROI, luminance coefficients, targets and tolerances; no gray card,
-camera transform, or creative intent is inferred.
-"""
+"""Image-derived correction measurements and exercise-based accuracy scoring."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,12 +7,17 @@ from math import isfinite
 from .exposure import PixelRegion, analyze_tonal_distribution, measure_exposure_region
 from .precision import PrecisionFrame
 from .scoring import ScoreReport, ScoringCriterion, build_score_report
+from .tonal_curve import (
+    ReferenceTonalCurve,
+    TonalCurveMeasurement,
+    measure_reference_tonal_curve,
+    tonal_curve_criteria,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class AccuracyTarget:
     """Exercise-authored targets in the declared linear working-space domain."""
-
     exposure_stops: float = 0.0
     exposure_tolerance_stops: float = 0.15
     neutral_spread: float = 0.03
@@ -35,6 +35,7 @@ class AccuracyTarget:
     highlight_fraction_target: float | None = None
     tonal_fraction_tolerance: float = 0.05
     tonal_weight: float = 1.0
+    reference_tonal_curve: ReferenceTonalCurve | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +50,7 @@ class AccuracyMeasurement:
     tonal_highlight_fraction: float | None
     tonal_luminance_percentiles: tuple[float, float, float, float, float] | None
     sample_count: int
+    reference_tonal_curve: TonalCurveMeasurement | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +60,7 @@ class CorrectionAccuracyResult:
 
 
 def _validate_target(target: AccuracyTarget) -> None:
-    scalar_values = (
+    values = (
         ("exposure target", target.exposure_stops),
         ("exposure tolerance", target.exposure_tolerance_stops),
         ("neutral target", target.neutral_spread),
@@ -71,7 +73,7 @@ def _validate_target(target: AccuracyTarget) -> None:
         ("tonal fraction tolerance", target.tonal_fraction_tolerance),
         ("tonal weight", target.tonal_weight),
     )
-    for name, value in scalar_values:
+    for name, value in values:
         if not isfinite(value):
             raise ValueError(f"{name} must be finite.")
     if len(target.luminance_coefficients) != 3 or len(target.white_balance_target) != 3:
@@ -98,15 +100,14 @@ def _validate_target(target: AccuracyTarget) -> None:
     if any(value is not None for value in tonal_values):
         if any(value is None for value in tonal_values):
             raise ValueError("Tonal scoring requires both thresholds and both target fractions.")
-        assert target.shadow_threshold is not None
-        assert target.highlight_threshold is not None
-        assert target.shadow_fraction_target is not None
-        assert target.highlight_fraction_target is not None
+        assert target.shadow_threshold is not None and target.highlight_threshold is not None
+        assert target.shadow_fraction_target is not None and target.highlight_fraction_target is not None
         if target.shadow_threshold < 0 or target.highlight_threshold <= target.shadow_threshold:
             raise ValueError("Tonal thresholds must be non-negative and shadow must be below highlight.")
-        if not (0 <= target.shadow_fraction_target <= 1
-                and 0 <= target.highlight_fraction_target <= 1):
+        if not (0 <= target.shadow_fraction_target <= 1 and 0 <= target.highlight_fraction_target <= 1):
             raise ValueError("Tonal fraction targets must be between 0 and 1.")
+    if target.reference_tonal_curve is not None:
+        target.reference_tonal_curve.validate()
 
 
 def measure_correction_accuracy(
@@ -139,6 +140,12 @@ def measure_correction_accuracy(
             shadow_threshold=target.shadow_threshold,
             highlight_threshold=target.highlight_threshold,
         )
+    curve = None
+    if target.reference_tonal_curve is not None:
+        curve = measure_reference_tonal_curve(
+            frame, target.reference_tonal_curve,
+            luminance_coefficients=target.luminance_coefficients,
+        )
 
     measurement = AccuracyMeasurement(
         working_space_id=frame.encoding.working_space_id,
@@ -151,21 +158,17 @@ def measure_correction_accuracy(
         tonal_highlight_fraction=tonal.highlight_fraction if tonal else None,
         tonal_luminance_percentiles=tonal.luminance_percentiles if tonal else None,
         sample_count=measured.sample_count,
+        reference_tonal_curve=curve,
     )
 
-    criteria = [
-        ScoringCriterion(
-            metric="exposure_stops_from_target",
-            measured=(
-                abs(measured.exposure_stops_from_gray - target.exposure_stops)
-                if measured.exposure_stops_from_gray is not None else None
-            ),
-            target=0.0, tolerance=target.exposure_tolerance_stops,
-            weight=target.exposure_weight, falloff=target.falloff,
-            unit="stops",
-            note="Absolute exposure deviation measured in validated linear light.",
-        ),
-    ]
+    criteria = [ScoringCriterion(
+        metric="exposure_stops_from_target",
+        measured=(abs(measured.exposure_stops_from_gray - target.exposure_stops)
+                  if measured.exposure_stops_from_gray is not None else None),
+        target=0.0, tolerance=target.exposure_tolerance_stops,
+        weight=target.exposure_weight, falloff=target.falloff, unit="stops",
+        note="Absolute exposure deviation measured in validated linear light.",
+    )]
     balance = measured.channel_balance
     for index, channel in enumerate(("red", "green", "blue")):
         criteria.append(ScoringCriterion(
@@ -178,37 +181,32 @@ def measure_correction_accuracy(
         ))
 
     if tonal is not None:
-        assert target.shadow_fraction_target is not None
-        assert target.highlight_fraction_target is not None
+        assert target.shadow_fraction_target is not None and target.highlight_fraction_target is not None
         criteria.extend((
             ScoringCriterion(
-                metric="shadow_fraction_deviation",
-                measured=tonal.shadow_fraction,
-                target=target.shadow_fraction_target,
-                tolerance=target.tonal_fraction_tolerance,
-                weight=target.tonal_weight / 2.0,
-                falloff=target.falloff,
-                unit="fraction",
+                metric="shadow_fraction_deviation", measured=tonal.shadow_fraction,
+                target=target.shadow_fraction_target, tolerance=target.tonal_fraction_tolerance,
+                weight=target.tonal_weight / 2.0, falloff=target.falloff, unit="fraction",
                 note="Full-frame shadow fraction at the exercise-defined linear-luminance threshold.",
             ),
             ScoringCriterion(
-                metric="highlight_fraction_deviation",
-                measured=tonal.highlight_fraction,
-                target=target.highlight_fraction_target,
-                tolerance=target.tonal_fraction_tolerance,
-                weight=target.tonal_weight / 2.0,
-                falloff=target.falloff,
-                unit="fraction",
+                metric="highlight_fraction_deviation", measured=tonal.highlight_fraction,
+                target=target.highlight_fraction_target, tolerance=target.tonal_fraction_tolerance,
+                weight=target.tonal_weight / 2.0, falloff=target.falloff, unit="fraction",
                 note="Full-frame highlight fraction at the exercise-defined linear-luminance threshold.",
             ),
         ))
+    if curve is not None:
+        assert target.reference_tonal_curve is not None
+        criteria.extend(tonal_curve_criteria(curve, target.reference_tonal_curve))
 
     score = build_score_report(
         "correction_accuracy", criteria, pipeline_verified=True,
         limitations=(
             "Exposure and white balance are measured only in the explicitly selected ROI.",
             "The learner or exercise author must confirm that the ROI genuinely represents a neutral reference.",
-            "Tonal fractions describe the full frame and are scored only when exercise targets and thresholds are supplied.",
+            "Tonal fractions and reference percentile curves use exercise-defined linear-luminance targets.",
+            "The percentile curve compares full-frame luminance distribution; it is not a semantic or artistic contrast judgement.",
             "This score does not assess creative look similarity or overall image quality.",
         ),
     )
