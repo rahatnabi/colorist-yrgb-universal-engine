@@ -72,12 +72,12 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
     frame = PrecisionFrame.from_interleaved(
         width=1, height=1, channel_names=("R", "G", "B"),
         values=(0.1, 0.2, 0.3), source_path="fixture", decoder="test",
-        encoding=ColorEncoding(profile_id="CameraLog"),
+        encoding=ColorEncoding(profile_id="test.camera.profile"),
     )
     with pytest.raises(TransformValidationError, match="did not pass"):
         apply_reference_validated_transform(
             frame, failed, source_space="CameraLog", destination_space="DWG-Linear",
-            config_path=config, output_transfer="linear",
+            config_path=config, output_transfer="linear", profile_id="test.camera.profile",
         )
     passed = validate_reference_vectors(
         transform_id="test.transform", source_space="CameraLog",
@@ -88,7 +88,7 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
     with pytest.raises(TransformValidationError, match="hash"):
         apply_reference_validated_transform(
             frame, passed, source_space="CameraLog", destination_space="DWG-Linear",
-            config_path=config, output_transfer="linear",
+            config_path=config, output_transfer="linear", profile_id="test.camera.profile",
         )
 
 
@@ -115,7 +115,7 @@ def test_apply_marks_frame_validated_only_after_matching_reference_record(tmp_pa
     )
     transformed = apply_reference_validated_transform(
         frame, result, source_space="CameraLog", destination_space="DWG-Linear",
-        config_path=config, output_transfer="linear",
+        config_path=config, output_transfer="linear", profile_id="test.camera.profile",
     )
     assert transformed.encoding.validated is True
     assert transformed.encoding.working_space_id == "DWG-Linear"
