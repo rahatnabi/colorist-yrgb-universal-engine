@@ -116,7 +116,7 @@ def bake_3d_cube(
         raise LookDevelopmentError("LUT size must be 17, 33, 35 or 65.")
     if not title.strip() or not input_space_id.strip():
         raise LookDevelopmentError("Look title and explicit input-space ID are required.")
-    safe_title = title.replace('"', "'").replace("\\n", " ").strip()
+    safe_title = title.replace('"', "'").replace("\n", " ").strip()
     lines = [
         f'TITLE "{safe_title}"',
         f"# COLORIST_YRGB_INPUT_SPACE={input_space_id}",
