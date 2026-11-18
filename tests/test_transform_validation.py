@@ -107,7 +107,7 @@ def test_apply_marks_frame_validated_only_after_matching_reference_record(tmp_pa
     frame = PrecisionFrame.from_interleaved(
         width=1, height=1, channel_names=("R", "G", "B"),
         values=(0.1, 0.2, 0.3), source_path="fixture", decoder="test",
-        encoding=ColorEncoding(profile_id="CameraLog"),
+        encoding=ColorEncoding(profile_id="test.camera.profile"),
     )
     monkeypatch.setattr(
         "yrgb_engine.transform_validation.transform_frame",
@@ -140,3 +140,29 @@ def test_validation_result_exports_registry_audit_record(tmp_path):
     assert record["transform_id"] == "test.camera-to-working"
     assert record["reference_set_id"] == "independent-chart-v2"
     assert len(record["config_sha256"]) == 64
+
+
+def test_apply_rejects_mismatched_camera_registry_profile(tmp_path, monkeypatch):
+    config = tmp_path / "config.ocio"
+    config.write_text("config-v1")
+    result = validate_reference_vectors(
+        transform_id="camera-to-dwg",
+        source_space="OCIO Camera Log Space",
+        destination_space="DaVinci Wide Gamut",
+        config_path=config,
+        reference_set_id="independent-reference-v1",
+        vectors=_vectors(),
+        evaluate_rgb=lambda rgb: rgb,
+    )
+    frame = PrecisionFrame.from_interleaved(
+        width=1, height=1, channel_names=("R", "G", "B"),
+        values=(0.1, 0.2, 0.3), source_path="fixture", decoder="test",
+        encoding=ColorEncoding(profile_id="sony.slog3.sgamut3cine"),
+    )
+    with pytest.raises(TransformValidationError, match="does not match"):
+        apply_reference_validated_transform(
+            frame, result, source_space="OCIO Camera Log Space",
+            destination_space="DaVinci Wide Gamut", config_path=config,
+            output_transfer="DaVinci Intermediate",
+            profile_id="canon.clog3.cinema_gamut",
+        )
