@@ -24,7 +24,7 @@ def _validate(config, **overrides):
         "profile_id": "test.camera.profile",
         "transform_id": "test.camera.to.working",
         "source_space": "OCIO Camera Log",
-        "destination_space": "DaVinci Wide Gamut",
+        "destination_space": "Linear DaVinci WideGamut",
         "config_path": config,
         "reference_set_id": "independent-fixture-v1",
         "vectors": _vectors(),
@@ -82,10 +82,10 @@ def test_apply_rejects_failed_validation_and_config_hash_mismatch(tmp_path, monk
     )
     kwargs = dict(
         source_space="OCIO Camera Log",
-        destination_space="DaVinci Wide Gamut",
+        destination_space="Linear DaVinci WideGamut",
         config_path=config,
-        output_transfer="DaVinci Intermediate",
-        output_primaries="DaVinci Wide Gamut",
+        output_transfer="Linear",
+        output_primaries="Linear DaVinci WideGamut",
         profile_id="test.camera.profile",
     )
     with pytest.raises(TransformValidationError, match="did not pass"):
@@ -107,16 +107,16 @@ def test_apply_marks_frame_validated_only_after_matching_evidence(tmp_path, monk
     transformed = apply_reference_validated_transform(
         _frame(), result,
         source_space="OCIO Camera Log",
-        destination_space="DaVinci Wide Gamut",
+        destination_space="Linear DaVinci WideGamut",
         config_path=config,
-        output_transfer="DaVinci Intermediate",
-        output_primaries="DaVinci Wide Gamut",
+        output_transfer="Linear",
+        output_primaries="Linear DaVinci WideGamut",
         profile_id="test.camera.profile",
     )
     assert transformed.encoding.validated is True
-    assert transformed.encoding.working_space_id == "DaVinci Wide Gamut"
-    assert transformed.encoding.transfer == "DaVinci Intermediate"
-    assert transformed.encoding.primaries == "DaVinci Wide Gamut"
+    assert transformed.encoding.working_space_id == "Linear DaVinci WideGamut"
+    assert transformed.encoding.transfer == "Linear"
+    assert transformed.encoding.primaries == "Linear DaVinci WideGamut"
     assert transformed.encoding.transform_id == "test.camera.to.working"
     assert transformed.metadata["yrgb_transform_validation"]["reference_set_id"] == "independent-fixture-v1"
 
@@ -129,10 +129,10 @@ def test_apply_rejects_mismatched_camera_registry_profile(tmp_path):
         apply_reference_validated_transform(
             _frame("sony.slog3.sgamut3cine"), result,
             source_space="OCIO Camera Log",
-            destination_space="DaVinci Wide Gamut",
+            destination_space="Linear DaVinci WideGamut",
             config_path=config,
-            output_transfer="DaVinci Intermediate",
-            output_primaries="DaVinci Wide Gamut",
+            output_transfer="Linear",
+            output_primaries="Linear DaVinci WideGamut",
             profile_id="canon.clog3.cinema_gamut",
         )
 
@@ -184,9 +184,9 @@ def test_registry_driven_prepare_applies_only_complete_approved_profile(tmp_path
         "status": "verified",
         "transform_id": "test.camera.to.working",
         "ocio_source_space": "OCIO Camera Log",
-        "ocio_destination_space": "DaVinci Wide Gamut",
-        "output_transfer": "DaVinci Intermediate",
-        "output_primaries": "DaVinci Wide Gamut",
+        "ocio_destination_space": "Linear DaVinci WideGamut",
+        "output_transfer": "Linear",
+        "output_primaries": "Linear DaVinci WideGamut",
         "validation": validation,
     }
     registry = ProfileRegistry([profile])
@@ -198,8 +198,8 @@ def test_registry_driven_prepare_applies_only_complete_approved_profile(tmp_path
         _frame(), registry=registry, config_path=config
     )
     assert prepared.encoding.validated is True
-    assert prepared.encoding.working_space_id == "DaVinci Wide Gamut"
-    assert prepared.encoding.transfer == "DaVinci Intermediate"
+    assert prepared.encoding.working_space_id == "Linear DaVinci WideGamut"
+    assert prepared.encoding.transfer == "Linear"
 
 
 def test_registry_driven_prepare_rejects_profile_evidence_from_other_config(tmp_path):
@@ -217,9 +217,9 @@ def test_registry_driven_prepare_rejects_profile_evidence_from_other_config(tmp_
         "status": "verified",
         "transform_id": "test.camera.to.working",
         "ocio_source_space": "OCIO Camera Log",
-        "ocio_destination_space": "DaVinci Wide Gamut",
-        "output_transfer": "DaVinci Intermediate",
-        "output_primaries": "DaVinci Wide Gamut",
+        "ocio_destination_space": "Linear DaVinci WideGamut",
+        "output_transfer": "Linear",
+        "output_primaries": "Linear DaVinci WideGamut",
         "validation": validation,
     }
     registry = ProfileRegistry([profile])
