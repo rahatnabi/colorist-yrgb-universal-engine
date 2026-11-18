@@ -1064,7 +1064,7 @@ def test_native_measurements_reject_roi_outside_still_before_processing(tmp_path
     response = client.post(
         "/v1/media/native-measurements",
         data={
-            "profile_id": profile_id, "roi_x": "1", "roi_y": "1",
+            "profile_id": profile_id, "roi_x": "3", "roi_y": "3",
             "roi_width": "2", "roi_height": "2",
         },
         files={"file": ("still.tif", b"fake-image", "image/tiff")},
