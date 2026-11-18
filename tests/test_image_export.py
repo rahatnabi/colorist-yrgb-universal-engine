@@ -1,5 +1,3 @@
-from array import array
-
 import pytest
 
 from yrgb_engine.cube import parse_cube_text
@@ -28,7 +26,7 @@ def _frame(channels=("R", "G", "B"), values=(0.2, 0.4, 0.6)):
 def test_apply_cube_requires_exact_validated_input_space():
     graded = apply_cube_to_frame(
         _frame(), _identity_lut(),
-        lut_input_space_id="test-linear", lut_output_space_id="display-test",
+        lut_input_space_id="test-linear", lut_output_space_id="display-test",\n        lut_output_transfer="sRGB",\n        lut_output_transfer="sRGB",
     )
     assert graded.encoding.working_space_id == "display-test"
     assert graded.encoding.validated is False
@@ -42,10 +40,10 @@ def test_apply_cube_rejects_unknown_or_mismatched_space():
     )
     with pytest.raises(ImageExportError, match="validated"):
         apply_cube_to_frame(unknown, _identity_lut(),
-                            lut_input_space_id="x", lut_output_space_id="y")
+                            lut_input_space_id="x", lut_output_space_id="y", lut_output_transfer="sRGB")
     with pytest.raises(ImageExportError, match="does not match"):
         apply_cube_to_frame(_frame(), _identity_lut(),
-                            lut_input_space_id="wrong", lut_output_space_id="y")
+                            lut_input_space_id="wrong", lut_output_space_id="y", lut_output_transfer="sRGB")
 
 
 def test_apply_cube_preserves_auxiliary_channels():
