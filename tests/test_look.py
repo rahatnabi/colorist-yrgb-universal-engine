@@ -49,4 +49,4 @@ def test_cube_bake_has_expected_header_and_grid_entries():
     assert 'TITLE "YRGB Neutral"' in result
     assert "LUT_3D_SIZE 17" in result
     assert result.count("\n") == 17**3 + 6
-    assert "0.200000000" in result
+    assert "0.500000000" in result
