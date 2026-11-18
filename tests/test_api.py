@@ -1223,6 +1223,9 @@ def test_cors_exposes_native_master_metadata_headers():
     assert "x-yrgb-frame-width" in exposed
     assert "x-yrgb-frame-height" in exposed
     assert "x-yrgb-float-samples-sha256" in exposed
+    assert "x-yrgb-delivery-qc-status" in exposed
+    assert "x-yrgb-correction-accuracy-score" in exposed
+    assert "x-yrgb-delivery-qc-report" in exposed
 
 
 def test_native_grade_export_requires_complete_delivery_qc_roi():
