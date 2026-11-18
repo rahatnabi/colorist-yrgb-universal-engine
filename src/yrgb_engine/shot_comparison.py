@@ -6,6 +6,7 @@ decode transfer functions, or interpret RGB differences as exposure or perceptua
 from __future__ import annotations
 
 from typing import Any
+import base64
 
 from .precision import PrecisionFrame
 
@@ -134,8 +135,31 @@ def align_and_compare(
             "root_mean_square_difference": float(np.sqrt(np.mean(channel_delta ** 2))),
         }
 
+    # A diagnostic overlay uses one shared percentile scale; it is not color managed.
+    combined_values = np.concatenate((ref_overlap.reshape(-1), cand_overlap.reshape(-1)))
+    preview_low, preview_high = np.percentile(combined_values, [1.0, 99.0])
+    if not np.isfinite(preview_low) or not np.isfinite(preview_high) or preview_high <= preview_low:
+        preview_low, preview_high = float(combined_values.min()), float(combined_values.max() + 1.0)
+    ref_preview = np.clip((ref - preview_low) / (preview_high - preview_low), 0.0, 1.0)
+    cand_preview = np.clip((warped - preview_low) / (preview_high - preview_low), 0.0, 1.0)
+    overlay = ref_preview.copy()
+    overlay[overlap] = 0.5 * ref_preview[overlap] + 0.5 * cand_preview[overlap]
+    encoded_ok, encoded_preview = cv2.imencode(
+        ".jpg", cv2.cvtColor((overlay * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR),
+        [cv2.IMWRITE_JPEG_QUALITY, 78],
+    )
+    preview_data_url = (
+        "data:image/jpeg;base64," + base64.b64encode(encoded_preview.tobytes()).decode("ascii")
+        if encoded_ok else None
+    )
+
     same_sample_domain = reference.sample_domain == candidate.sample_domain
     return {
+        "alignment_preview_data_url": preview_data_url,
+        "alignment_preview_note": (
+            "50/50 reference and aligned-candidate overlay with a shared 1st-99th percentile sample scale. "
+            "Diagnostic only; not a color-managed display transform."
+        ),
         "alignment": {
             "method": "ORB feature matching + RANSAC homography",
             "reference_size": {"width": reference.width, "height": reference.height},
