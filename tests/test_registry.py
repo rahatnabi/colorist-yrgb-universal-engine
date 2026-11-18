@@ -291,3 +291,26 @@ def test_nikon_dji_and_red_gamut_pairs_are_explicit():
     assert registry.resolve(
         manufacturer="RED", encoding="Log3G12", gamut="REDWideGamutRGB"
     )["id"] == "red.log3g12.redwidegamutrgb"
+
+
+def test_apple_log_and_apple_log2_are_distinct_exact_profiles():
+    registry = ProfileRegistry.load()
+    apple_log = registry.resolve(
+        manufacturer="Apple",
+        encoding="Apple Log",
+        gamut="BT.2020",
+    )
+    apple_log2 = registry.resolve(
+        manufacturer="Apple",
+        encoding="Apple Log 2",
+        gamut="Apple Gamut",
+    )
+    assert apple_log["id"] == "apple.applelog"
+    assert apple_log2["id"] == "apple.applelog2.apple_gamut"
+    assert apple_log["usable_for_transform"] is False
+    assert apple_log2["usable_for_transform"] is False
+    assert registry.resolve(
+        manufacturer="Apple",
+        encoding="Apple Log",
+        gamut="Apple Gamut",
+    ) is None
