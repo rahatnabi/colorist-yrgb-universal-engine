@@ -565,6 +565,148 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         finally:
             await file.close()
 
+
+    @app.post("/v1/media/transform-preview")
+    async def media_transform_preview(
+        file: UploadFile = File(...),
+        profile_id: str = Form(..., min_length=1, max_length=160),
+    ) -> FileResponse:
+        """Prepare a still through an approved camera transform and render a preview.
+
+        Camera profile selection is explicit. The camera transform must be
+        reference-validated and the OCIO config is supplied by server settings.
+        The display transform is preview-only, not a mastering/export approval.
+        """
+        from dataclasses import replace
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+        from .ocio import transform_frame
+        from .preview import PreviewRenderError, save_preview_png
+        from .transform_validation import (
+            TransformValidationError,
+            prepare_frame_for_working_space,
+        )
+
+        profile = profile_registry.get_by_id(profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Selected camera profile is not in the registry.")
+        if not profile.get("usable_for_transform"):
+            raise HTTPException(
+                status_code=409,
+                detail="Selected camera profile is not reference-validated; automatic conversion is blocked.",
+            )
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
+        preview_transfer = os.getenv("YRGB_PREVIEW_TRANSFER", "").strip()
+        preview_primaries = os.getenv("YRGB_PREVIEW_PRIMARIES", "").strip()
+        if not all((config_value, preview_space, preview_transfer, preview_primaries)):
+            raise HTTPException(
+                status_code=503,
+                detail="Configure YRGB_OCIO_CONFIG, YRGB_PREVIEW_SPACE, YRGB_PREVIEW_TRANSFER and YRGB_PREVIEW_PRIMARIES on the server.",
+            )
+
+        filename = Path(file.filename or "upload.tif").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        preview_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-transform-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds the 512 MiB limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+            try:
+                frame = await run_in_threadpool(decode_oiio_float, temporary_path)
+            except HighPrecisionDecodeError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            if frame.width * frame.height > 40_000_000:
+                raise HTTPException(status_code=413, detail="Decoded image exceeds 40 megapixel preview limit.")
+            if not all(channel in {name.upper() for name in frame.channel_names} for channel in ("R", "G", "B")):
+                raise HTTPException(status_code=422, detail="Decoded image must expose named R, G and B channels.")
+
+            frame = replace(
+                frame,
+                encoding=replace(frame.encoding, profile_id=profile_id),
+                metadata={**frame.metadata, "yrgb_selected_camera_profile": profile_id},
+            )
+            try:
+                working_frame = await run_in_threadpool(
+                    prepare_frame_for_working_space,
+                    frame,
+                    registry=profile_registry,
+                    config_path=config_value,
+                )
+                display_frame = await run_in_threadpool(
+                    transform_frame,
+                    working_frame,
+                    source_space=str(profile["ocio_destination_space"]),
+                    destination_space=preview_space,
+                    config_path=config_value,
+                )
+                display_frame = replace(
+                    display_frame,
+                    encoding=replace(
+                        display_frame.encoding,
+                        primaries=preview_primaries,
+                        transfer=preview_transfer,
+                        profile_id=preview_space,
+                        working_space_id=preview_space,
+                        transform_id=None,
+                        validated=False,
+                        metadata_source="preview-only OCIO display transform; not delivery validated",
+                    ),
+                    metadata={
+                        **display_frame.metadata,
+                        "yrgb_preview_only": True,
+                        "yrgb_display_transform_validated": False,
+                        "yrgb_camera_transform_id": profile["transform_id"],
+                    },
+                )
+            except TransformValidationError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=f"OCIO preview transform failed: {exc}") from exc
+
+            with tempfile.NamedTemporaryFile(prefix="yrgb-preview-", suffix=".png", delete=False) as output:
+                preview_path = output.name
+            await run_in_threadpool(
+                save_preview_png,
+                display_frame,
+                preview_path,
+                display_space_id=preview_space,
+                output_transfer=preview_transfer,
+            )
+            response = FileResponse(
+                preview_path,
+                media_type="image/png",
+                filename=f"{Path(filename).stem}_yrgb_preview.png",
+                headers={
+                    "X-YRGB-Camera-Profile": profile_id,
+                    "X-YRGB-Camera-Transform-Validated": "true",
+                    "X-YRGB-Preview-Only": "true",
+                    "X-YRGB-Display-Transform-Validated": "false",
+                    "X-YRGB-Working-Space": str(profile["ocio_destination_space"]),
+                },
+                background=BackgroundTask(lambda: Path(preview_path).unlink(missing_ok=True)),
+            )
+            preview_path = None
+            return response
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError, PreviewRenderError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+            if preview_path:
+                Path(preview_path).unlink(missing_ok=True)
+
     return app
 
 
