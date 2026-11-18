@@ -14,26 +14,26 @@ def test_footage_library_schema_is_valid_json_schema_document():
     assert "profile_claim" in schema["required"]
 
 
-def test_first_sony_intake_is_registered_but_not_falsely_verified():
+def test_two_sony_clips_are_registered_independently_and_not_falsely_verified():
     manifest = json.loads((ROOT / "data/footage_library/assets.json").read_text())
     assert manifest["schema_version"] == 1
-    assert len(manifest["assets"]) == 1
+    assert len(manifest["assets"]) == 2
 
-    asset = manifest["assets"][0]
-    assert asset["asset_kind"] == "camera_original"
-    assert asset["asset_state"] == "registered"
-    assert asset["profile_claim"] == {
-        "transfer_function": "Sony S-Log3",
-        "gamut": "Sony S-Gamut3.Cine",
-        "claim_source": "user_asserted",
-        "verification_state": "unverified",
-    }
-    assert {item["filename"] for item in asset["files"]} == {
-        "C1382.MP4",
-        "C1382M01.XML",
-        "C1383.MP4",
-        "C1383M01.XML",
-    }
-    assert all(item["acquisition_state"] == "pending" for item in asset["files"])
-    assert all(item["sha256"] is None for item in asset["files"])
-    assert asset["provenance"]["rights_status"] == "unknown"
+    by_id = {asset["asset_id"]: asset for asset in manifest["assets"]}
+    assert set(by_id) == {"sony-slog3cine-c1382", "sony-slog3cine-c1383"}
+    for clip in ("C1382", "C1383"):
+        asset = by_id[f"sony-slog3cine-{clip.lower()}"]
+        assert asset["asset_kind"] == "camera_original"
+        assert asset["asset_state"] == "registered"
+        assert asset["profile_claim"] == {
+            "transfer_function": "Sony S-Log3",
+            "gamut": "Sony S-Gamut3.Cine",
+            "claim_source": "user_asserted",
+            "verification_state": "unverified",
+        }
+        assert {item["filename"] for item in asset["files"]} == {
+            f"{clip}.MP4", f"{clip}M01.XML"
+        }
+        assert all(item["acquisition_state"] == "pending" for item in asset["files"])
+        assert all(item["sha256"] is None for item in asset["files"])
+        assert asset["provenance"]["rights_status"] == "unknown"
