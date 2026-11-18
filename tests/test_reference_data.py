@@ -34,6 +34,10 @@ def _manifest():
         "reference_set_id": "sony-independent-chart-v1",
         "reference_source": "Independent measured chart dataset, accession REF-001",
         "measurement_method": "Documented camera capture and spectrophotometer workflow",
+        "camera_model": "Sony FX6",
+        "recording_mode": "S-Log3 / S-Gamut3.Cine",
+        "codec": "XAVC-I",
+        "bit_depth": 10,
         "vectors": [{
             "label": "neutral-patch-18",
             "source_rgb": [0.4, 0.4, 0.4],
@@ -117,3 +121,12 @@ def test_manifest_runs_pinned_ocio_validation_and_returns_audit(tmp_path, monkey
     assert captured["source_space"] == "S-Log3 S-Gamut3.Cine"
     assert captured["vectors"][0].label == "neutral-patch-18"
     assert captured["tolerance"] == 0.0001
+
+
+def test_reference_manifest_requires_valid_bit_depth(tmp_path):
+    manifest = _manifest()
+    manifest["bit_depth"] = 0
+    path = tmp_path / "bad-bit-depth.json"
+    path.write_text(json.dumps(manifest))
+    with pytest.raises(ReferenceManifestError, match="bit_depth"):
+        load_reference_manifest(path)
