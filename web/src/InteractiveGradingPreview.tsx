@@ -1,14 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { applyInteractiveLook, type InteractiveLookSettings } from "./grading";
 
+export type InteractivePreviewAnalysis = {
+  width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string;
+  analysis: {
+    channels: Record<string, { mean: number }>;
+    histograms: Record<string, { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number }>;
+    rgb_parade: Record<string, { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number }>;
+    waveform: { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
+    vectorscope_points: [number, number][]; scope_standard: "bt709"; scope_note: string; note: string;
+  };
+};
+
 type Props = {
   sourceUrl: string;
   filename: string;
   settings: InteractiveLookSettings;
   curveMidpoint: number;
+  onRender?: (result: InteractivePreviewAnalysis) => void;
 };
 
-export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint }: Props) {
+export default function InteractiveGradingPreview({ sourceUrl, filename, settings, curveMidpoint, onRender }: Props) {
+  const onRenderRef = useRef(onRender);
+  onRenderRef.current = onRender;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState("Waiting for a browser-decodable still image");
@@ -22,6 +36,11 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       return;
     }
     let active = true;
+    sourceCanvasRef.current = null;
+    setDimensions(null);
+    setStatus("Decoding still image…");
+    const visibleCanvas = canvasRef.current;
+    if (visibleCanvas) { visibleCanvas.width = 1; visibleCanvas.height = 1; }
     const image = new Image();
     image.onload = () => {
       if (!active) return;
@@ -66,6 +85,58 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
     const graded = applyInteractiveLook(pixels, { settings, curve_midpoint: curveMidpoint });
     context.putImageData(graded, 0, 0);
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const bins = 128;
+    const scopeWidth = 128;
+    const scopeHeight = 96;
+    const channels = ["R", "G", "B"] as const;
+    const histogramCounts = channels.map(() => new Array(bins).fill(0));
+    const paradeCounts = channels.map(() => Array.from({ length: scopeWidth }, () => new Array(scopeHeight).fill(0)));
+    const waveformCounts = Array.from({ length: scopeWidth }, () => new Array(scopeHeight).fill(0));
+    const means = [0, 0, 0];
+    const vectorscope: [number, number][] = [];
+    const data = graded.data;
+    let pixelCount = 0;
+    for (let offset = 0; offset < data.length; offset += 4) {
+      const r = data[offset] / 255;
+      const g = data[offset + 1] / 255;
+      const b = data[offset + 2] / 255;
+      const values = [r, g, b];
+      const x = Math.min(scopeWidth - 1, Math.floor((pixelCount % width) / width * scopeWidth));
+      values.forEach((value, channel) => {
+        means[channel] += value;
+        histogramCounts[channel][Math.min(bins - 1, Math.floor(value * bins))] += 1;
+        const y = scopeHeight - 1 - Math.min(scopeHeight - 1, Math.floor(value * scopeHeight));
+        paradeCounts[channel][x][y] += 1;
+      });
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const waveY = scopeHeight - 1 - Math.min(scopeHeight - 1, Math.floor(luma * scopeHeight));
+      waveformCounts[x][waveY] += 1;
+      const cb = (b - luma) / 1.8556;
+      const cr = (r - luma) / 1.5748;
+      if (pixelCount % Math.max(1, Math.floor(width * height / 12000)) === 0) vectorscope.push([cb, cr]);
+      pixelCount += 1;
+    }
+    const histograms = Object.fromEntries(channels.map((channel, index) => [channel, {
+      counts: histogramCounts[index], minimum: 0, maximum: 1, underflow: 0, overflow: 0,
+    }]));
+    const rgbParade = Object.fromEntries(channels.map((channel, index) => [channel, {
+      counts: paradeCounts[index], width: scopeWidth, height: scopeHeight,
+      minimum: 0, maximum: 1, underflow: 0, overflow: 0,
+    }]));
+    onRenderRef.current?.({
+      width, height, decoder: "Browser Canvas", sample_domain: "graded_browser_srgb_preview",
+      analysis: {
+        channels: Object.fromEntries(channels.map((channel, index) => [channel, { mean: means[index] / Math.max(1, pixelCount) }])),
+        histograms, rgb_parade: rgbParade,
+        waveform: { counts: waveformCounts, width: scopeWidth, height: scopeHeight, minimum: 0, maximum: 1, underflow: 0, overflow: 0 },
+        vectorscope_points: vectorscope, scope_standard: "bt709",
+        scope_note: "Live scopes are calculated from the graded, browser-decoded sRGB preview. They are not calibrated IRE/nits or camera-log scopes.",
+        note: "Live graded preview scope statistics · browser sRGB display-referred sample domain.",
+      },
+    });
   }, [settings, curveMidpoint, dimensions]);
 
   function exportPreview() {
