@@ -12,6 +12,7 @@ _FIELD_MAP = {
 
 _ALIASES = {
     "rec709": "bt709",
+    "rec.709": "bt709",
     "bt.709": "bt709",
     "slog3": "s-log3",
     "s-log3-cine": "s-log3",
