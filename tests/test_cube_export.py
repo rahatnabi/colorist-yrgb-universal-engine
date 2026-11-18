@@ -31,8 +31,8 @@ def test_generate_cube_rejects_unsupported_size_and_bad_output():
 def test_resample_existing_cube_to_35_points():
     source = parse_cube_text(
         "LUT_3D_SIZE 2\n" +
-        "0 0 0\n1 0 0\n0 1 0\n1 1 0\n"
-        "0 0 1\n1 0 1\n0 1 1\n1 1 1\n"
+        "0 0 0\n0 0 1\n0 1 0\n0 1 1\n"
+        "1 0 0\n1 0 1\n1 1 0\n1 1 1\n"
     )
     parsed = parse_cube_text(resample_cube_text(source, size=35))
     assert parsed.size_3d == 35
