@@ -124,7 +124,7 @@ The media probe exposes a `capture_metadata` object sourced only from ffprobe/co
 
 For each of FX3, FX6, and FX9, create a separate manifest with the exact model identifier reported by the camera, recording mode, codec/profile, bit depth, firmware, and actual gamut used (S-Gamut3.Cine versus S-Gamut3). Do not assume all three cameras or recording modes share those settings. If container metadata omits recording mode or firmware, capture those values from the camera's recording setup/report and preserve that provenance alongside the reference set.
 
-The current manifest validator requires one exact camera model, recording mode, codec, and bit depth. It validates the selected OCIO transform against supplied measured vectors; it does not itself establish whether camera metadata is genuine or whether reference measurements are traceable. The three camera-specific reference sets therefore remain pending until independently measured values and provenance are supplied.
+The current manifest validator requires one exact camera model, recording mode, codec, and bit depth. It validates the selected OCIO transform against supplied measured vectors; it does not itself establish whether camera metadata is genuine or whether reference measurements are traceable. The three camera-specific reference sets therefore remain pending until independently measured values and provenance are supplied. When a registry profile declares a `camera_models` allowlist, the manifest's `camera_model` must match one of those names (case-insensitive); a reference set for another model is rejected before OCIO evaluation. Reference-vector labels must also be unique within a manifest.
 
 
 ## Sony FX3 / FX6 / FX9 camera-specific capture sets
