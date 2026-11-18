@@ -284,7 +284,7 @@ export default function App() {
           <section className="card media-card">
             <div className="card-heading"><div><span className="section-kicker">SOURCE</span><h2>Media Input</h2></div><span className="subtle-tag">STILL IMAGES ONLY</span></div>
             <label className="drop-zone" htmlFor="media-file">
-              <input id="media-file" type="file" accept="image/*,.dng,.exr,.dpx" onChange={e => { const selected = e.target.files?.[0]; if (selected) void inspectMedia(selected); }} />
+              <input id="media-file" type="file" accept="image/*,.dng,.tif,.tiff,.exr,.dpx" onChange={e => { const selected = e.target.files?.[0]; if (selected) void inspectMedia(selected); }} />
               <div className="upload-icon"><UploadCloud size={23} /></div><strong>Drop media here or <em>browse files</em></strong><span>RAW · TIFF · EXR · DPX · JPEG · PNG · WebP · Image sequences</span><span className="upload-limit">MAX UPLOAD 512 MB · SERVER TEMP FILE REMOVED AFTER PROBE</span>
             </label>
             {error && <div className="error-message">{error}</div>}
@@ -338,6 +338,29 @@ export default function App() {
                 {transformPreviewUrl && <img className="transform-preview-image" src={transformPreviewUrl} alt="Reference-gated color transform preview" />}
               </div>}
               {probe && <div className="probe-details"><div><small>DETECTED TYPE</small><b>{probe.probe.detected_type || "Unknown"}</b></div><div><small>FILE SIGNATURE</small><b>{probe.probe.signature || "Unknown"}</b></div><div><small>PROBE STATUS</small><b>{probe.probe.status || "Unknown"}</b></div></div>}
+              {probe?.probe.metadata && typeof probe.probe.metadata === "object" && (() => {
+                const metadata = probe.probe.metadata as Record<string, unknown>;
+                const capture = metadata.capture_metadata && typeof metadata.capture_metadata === "object" ? metadata.capture_metadata as Record<string, unknown> : {};
+                const fields: [string, unknown][] = [
+                  ["Camera make", capture.camera_make], ["Camera model", capture.camera_model],
+                  ["Recording mode", capture.recording_mode], ["Lens", capture.lens_model],
+                  ["Gamma / transfer", capture.color_transfer || capture.gamma],
+                  ["Color primaries / gamut", capture.color_primaries || capture.gamut],
+                  ["Codec", capture.codec], ["Bit depth", capture.bit_depth],
+                  ["ISO", capture.iso], ["Shutter", capture.shutter_speed],
+                  ["Aperture", capture.aperture], ["White balance", capture.white_balance],
+                  ["Capture date", capture.capture_datetime], ["Firmware", capture.firmware_version],
+                  ["Image dimensions", metadata.width && metadata.height ? String(metadata.width) + " × " + String(metadata.height) : undefined],
+                  ["Pixel mode", metadata.mode], ["ICC profile", metadata.icc_profile_present === true ? "Embedded" : metadata.icc_profile_present === false ? "Not embedded" : undefined],
+                ];
+                const available = fields.filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "");
+                return <section className="camera-metadata-panel">
+                  <div className="camera-metadata-heading"><b>CAMERA METADATA</b><span>{available.length} REPORTED FIELDS</span></div>
+                  {available.length ? <div className="camera-metadata-grid">{available.map(([label, value]) => <div key={label}><small>{label}</small><b>{String(value)}</b></div>)}</div> : <p>No camera metadata was found in this still image. Try an original camera file or an accompanying metadata sidecar; missing values are not inferred.</p>}
+                  <div className="camera-metadata-tools"><button type="button" className="profile-select-button" disabled={!capture.camera_make && !capture.camera_model && !capture.color_transfer && !capture.color_primaries} onClick={() => void matchDetectedCapture()}>Match camera profile from metadata</button><span>Only embedded/reported metadata is shown. A Log label alone does not validate the image transform.</span></div>
+                  {Object.keys(capture).length > 0 && <details><summary>View complete extracted capture metadata</summary><pre>{JSON.stringify(capture, null, 2)}</pre></details>}
+                </section>;
+              })()}
               {probe?.probe.warnings?.length ? <div className="warning-line">{probe.probe.warnings.join(" · ")}</div> : null}
               {isVideo && <div className="video-frame-control">
                 <label>FRAME TIME (SECONDS)<input type="number" min="0" max="86400" step="0.1" value={frameTimestamp} onChange={e => setFrameTimestamp(e.target.value)} /></label>
@@ -481,7 +504,7 @@ export default function App() {
           <div className="card-heading"><div><span className="section-kicker">SEQUENCE INTELLIGENCE</span><h2>Still Image Batch Analysis</h2></div><FileImage size={18} className="muted-icon" /></div>
           <p className="lut-export-description">Compare a bounded sequence of still images. Each image is decoded and measured independently; adjacent RGB mean differences remain sample-domain diagnostics, not exposure matching.</p>
           <div className="batch-controls">
-            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { const selected = Array.from(event.target.files || []); setBatchFiles(selected.slice(0, 24)); setCompareA(0); setCompareB(Math.min(1, selected.length - 1)); setBatchResult(null); setAlignmentResult(null); setAlignmentNote(""); setBatchNote(selected.length > 24 ? "Only the first 24 images were kept. The batch limit is 24." : ""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
+            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.dng,.tif,.tiff,.exr,.dpx" multiple onChange={event => { const selected = Array.from(event.target.files || []); setBatchFiles(selected.slice(0, 24)); setCompareA(0); setCompareB(Math.min(1, selected.length - 1)); setBatchResult(null); setAlignmentResult(null); setAlignmentNote(""); setBatchNote(selected.length > 24 ? "Only the first 24 images were kept. The batch limit is 24." : ""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
             <button type="button" className="primary-button" disabled={!apiOnline || batchBusy || batchFiles.length === 0 || batchFiles.length > 24} onClick={async () => {
               setBatchBusy(true); setBatchResult(null); setBatchNote("Analyzing image sequence…");
               try {
