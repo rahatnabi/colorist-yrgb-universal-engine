@@ -75,7 +75,7 @@ def test_save_frame_image_png_round_trip(tmp_path):
     frame = PrecisionFrame.from_interleaved(
         width=1, height=1, channel_names=("R", "G", "B", "A"),
         values=(0.2, 0.4, 0.6, 0.5), source_path="fixture", decoder="test",
-        encoding=ColorEncoding(working_space_id="sRGB", transfer="sRGB"),
+        encoding=ColorEncoding(working_space_id="sRGB", transfer="sRGB", validated=True),
     )
     path = save_frame_image(
         frame, tmp_path / "graded.png", image_format="PNG",
@@ -85,3 +85,11 @@ def test_save_frame_image_png_round_trip(tmp_path):
     with Image.open(path) as image:
         assert image.mode == "RGBA"
         assert image.getpixel((0, 0)) == (51, 102, 153, 128)
+
+
+def test_save_frame_image_rejects_unvalidated_output_transform():
+    with pytest.raises(ImageExportError, match="validated output transform"):
+        save_frame_image(
+            _frame(), "out.png", image_format="PNG",
+            output_space_id="test-linear", output_transfer="linear",
+        )
