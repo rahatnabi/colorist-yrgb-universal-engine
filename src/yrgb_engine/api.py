@@ -195,7 +195,10 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 Path(temporary_path).unlink(missing_ok=True)
 
     @app.post("/v1/media/analyze")
-    async def media_analyze(file: UploadFile = File(...)) -> dict[str, Any]:
+    async def media_analyze(
+        file: UploadFile = File(...),
+        scope_standard: str | None = Query(default=None, pattern="^(bt709|bt2020)$"),
+    ) -> dict[str, Any]:
         """Decode a still through OpenImageIO and return sample-domain scopes.
 
         No camera transform, transfer-function assumption, IRE mapping, or
@@ -233,6 +236,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             if not all(name.upper() in {c.upper() for c in frame.channel_names} for name in ("R", "G", "B")):
                 raise HTTPException(status_code=422, detail="Decoded image does not expose named R, G and B channels.")
 
+            from .scope_profiles import get_scope_coefficients
+            coefficients = get_scope_coefficients(scope_standard) if scope_standard else None
             result = await run_in_threadpool(
                 analyze_frame,
                 frame,
@@ -240,6 +245,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 scope_width=128,
                 scope_height=96,
                 value_range=(0.0, 1.0),
+                waveform_coefficients=coefficients,
+                vectorscope_coefficients=coefficients,
             )
             return {
                 "filename": filename,
@@ -252,10 +259,17 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     "channels": {key: asdict(value) for key, value in result.channels.items()},
                     "histograms": {key: asdict(value) for key, value in result.histograms.items()},
                     "rgb_parade": {key: asdict(value) for key, value in result.rgb_parade.items()},
-                    "waveform": None,
+                    "waveform": asdict(result.waveform) if result.waveform else None,
                     "luminance": None,
-                    "vectorscope_points": None,
-                    "note": "Code-value analysis only. No IRE, luminance, vectorscope or camera transform is inferred.",
+                    "vectorscope_points": [list(point) for point in result.vectorscope_points] if result.vectorscope_points else None,
+                    "scope_standard": scope_standard,
+                    "scope_note": (
+                        f"Waveform and vectorscope use manually selected {scope_standard.upper()} coefficients "
+                        "on decoded sample-domain RGB; this does not validate the source color encoding."
+                        if scope_standard else
+                        "Select BT.709 or BT.2020 explicitly to calculate luma-based waveform and vectorscope."
+                    ),
+                    "note": "Source sample-domain analysis only; no IRE, linear-light luminance or camera transform is inferred.",
                 },
             }
         except HTTPException:
@@ -271,6 +285,7 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
     async def media_video_frame(
         file: UploadFile = File(...),
         timestamp_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+        scope_standard: str | None = Query(default=None, pattern="^(bt709|bt2020)$"),
     ) -> dict[str, Any]:
         """Decode and analyze one video frame at an explicit timestamp.
 
@@ -304,9 +319,13 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     raise HTTPException(status_code=503, detail=str(exc)) from exc
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+            from .scope_profiles import get_scope_coefficients
+            coefficients = get_scope_coefficients(scope_standard) if scope_standard else None
             result = await run_in_threadpool(
                 analyze_frame, frame, histogram_bins=128, scope_width=128,
                 scope_height=96, value_range=(0.0, 1.0),
+                waveform_coefficients=coefficients,
+                vectorscope_coefficients=coefficients,
             )
             return {
                 "filename": filename, "timestamp_seconds": timestamp_seconds,
@@ -317,8 +336,17 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     "channels": {key: asdict(value) for key, value in result.channels.items()},
                     "histograms": {key: asdict(value) for key, value in result.histograms.items()},
                     "rgb_parade": {key: asdict(value) for key, value in result.rgb_parade.items()},
-                    "waveform": None, "luminance": None, "vectorscope_points": None,
-                    "note": "Source sample-domain analysis only; no camera transform, IRE or luminance interpretation is inferred.",
+                    "waveform": asdict(result.waveform) if result.waveform else None,
+                    "luminance": None,
+                    "vectorscope_points": [list(point) for point in result.vectorscope_points] if result.vectorscope_points else None,
+                    "scope_standard": scope_standard,
+                    "scope_note": (
+                        f"Waveform and vectorscope use manually selected {scope_standard.upper()} coefficients "
+                        "on decoded sample-domain RGB; this does not validate the source color encoding."
+                        if scope_standard else
+                        "Select BT.709 or BT.2020 explicitly to calculate luma-based waveform and vectorscope."
+                    ),
+                    "note": "Source sample-domain analysis only; no camera transform, IRE or linear-light luminance is inferred.",
                 },
             }
         except HTTPException:
