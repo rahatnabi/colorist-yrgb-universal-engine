@@ -69,3 +69,26 @@ The scanner is CPU-based and grid-resolution dependent. Small patches may be mis
 if they fall across cell boundaries; higher grid density improves localization at
 additional computational cost. Automatic segmentation and learned object detection
 are not part of this phase.
+
+
+## Temporal exposure consistency
+
+`iter_temporal_exposure` streams frame measurements and retains only the prior
+measurement plus the current shot reference. It reports per-frame exposure change,
+cumulative drift from the start of the current shot, and RGB channel-balance change.
+The caller supplies a confirmed ROI and zero-based confirmed shot-boundary indices.
+A boundary resets the reference and suppresses a cross-shot delta; histogram-based
+shot-change candidates are advisory and are not automatically treated as boundaries.
+
+Every frame must be explicitly marked as validated linear RGB and carry the same
+`working_space_id`. Camera-specific `transform_id` values may differ because
+different validated camera transforms can map into one common working space.
+The engine does not verify transform correctness; it trusts the upstream validation
+flag and declared destination identity. Unknown or mismatched working spaces are
+rejected. Timestamps must be finite, non-negative, and strictly increasing.
+
+A single ROI is applied across the supplied sequence. This is appropriate only when
+the same reference patch remains in the same image coordinates. For reframing,
+camera movement, subject movement, or a new neutral patch, segment the analysis and
+supply a newly confirmed ROI. No automatic tracking or semantic shot detection is
+claimed. The engine is CPU-based and makes no automatic exposure correction.
