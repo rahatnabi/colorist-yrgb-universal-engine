@@ -35,6 +35,11 @@ function ScopePanel({ title, subtitle, icon, histograms, parades, waveform, vect
   const hasSignal = hasHistogram || hasParade || hasWaveform || hasVectorscope;
   return <section className="scope-panel">
     <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
+    <div className="scope-controls">
+      {(kind === "parade" || kind === "histogram") && <label>CHANNEL <select value={channelMode} onChange={event => setChannelMode(event.target.value)}><option value="RGB">RGB</option><option value="R">Red</option><option value="G">Green</option><option value="B">Blue</option></select></label>}
+      {kind === "waveform" && <span className="scope-control-static">LUMA ONLY · RGB WAVEFORM NOT AVAILABLE</span>}
+      {kind === "vectorscope" && <><label>ZOOM <input type="range" min="1" max="2.5" step="0.1" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label><label>DENSITY <input type="range" min="10" max="100" step="5" value={density} onChange={event => setDensity(Number(event.target.value))} /></label></>}
+    </div>
     <div className={"scope-screen" + (hasParade ? " rgb-parade-screen" : "")}><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
       {hasHistogram ? <svg className="rgb-histogram" viewBox="0 0 128 100" preserveAspectRatio="none" role="img" aria-label="RGB channel histogram">
         {visibleChannels.map(channel => {
@@ -449,7 +454,7 @@ export default function App() {
           </section>
         </div>
 
-        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><button type="button" disabled={!analysis || busy} onClick={() => { if (analysis) { setFrozenAnalysis(analysis); setScopeFrozen(true); } }}>{scopeFrozen ? "FROZEN" : "FREEZE"}</button><button type="button" disabled={!file || busy || !apiOnline} onClick={() => void refreshScopes(scopeStandard)}>REFRESH</button><span className="subtle-tag">{scopeFrozen ? "FROZEN SNAPSHOT" : scopeDisplayAnalysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
+        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><button type="button" disabled={!analysis || busy} onClick={() => { if (scopeFrozen) { setScopeFrozen(false); setFrozenAnalysis(null); } else if (analysis) { setFrozenAnalysis(analysis); setScopeFrozen(true); } }}>{scopeFrozen ? "UNFREEZE" : "FREEZE"}</button><button type="button" disabled={!file || busy || !apiOnline} onClick={() => void refreshScopes(scopeStandard)}>REFRESH</button><span className="subtle-tag">{scopeFrozen ? "FROZEN SNAPSHOT" : scopeDisplayAnalysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
           <ScopePanel kind="waveform" title="Luma Waveform" subtitle="Luma-weighted · manually selected coefficients · source sample values" icon={<Activity size={15} />} waveform={scopeDisplayAnalysis?.analysis.waveform} />
