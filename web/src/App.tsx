@@ -15,6 +15,7 @@ type RoiMeasurement = { roi: { x: number; y: number; width: number; height: numb
 type VideoSampleFrame = { timestamp_seconds: number; frame_index: number; shot_index: number; histogram_distance: number | null; channel_mean_delta: number[] | null; mean_luminance_delta: number | null; shot_change_candidate: boolean; channels: Record<string, { mean: number }>; roi_measurement: RoiMeasurement };
 type ShotGroup = { shot_index: number; start_frame_index: number; end_frame_index: number; start_seconds: number; end_seconds: number; sampled_frame_count: number; boundary_candidate: boolean; boundary_histogram_distance: number | null };
 type DenseTemporalReport = { temporal_analysis: { frequency_analysis: { status: string; frequency_hz?: number }; spatial_coherence: { status: string; coherent_tile_count?: number; tile_count?: number }; scene_boundary_candidates: { sample_index: number; timestamp_seconds: number; relative_rgb_mean_step: number; status: string }[]; exposure_drift_assessment: { status: string } } };
+type BatchAnalysis = { image_count: number; images: { index: number; filename: string; width: number; height: number; sample_domain: string; channels: Record<string, { mean: number }> }[]; adjacent_comparisons: { from_index: number; to_index: number; channel_mean_delta: Record<string, number>; measurement_domain: string }[]; comparison_note: string };
 type VideoSampleReport = { frame_count: number; start_seconds: number; interval_seconds: number; shot_change_threshold: number | null; roi: RoiMeasurement["roi"]; frames: VideoSampleFrame[]; shot_groups: ShotGroup[]; consistency_status: Record<string, string>; note: string };
 
 function formatBytes(bytes: number) {
@@ -77,6 +78,10 @@ export default function App() {
   const [apiOnline, setApiOnline] = useState(false);
   const [ocioStatus, setOcioStatus] = useState<OcioStatus | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [batchFiles, setBatchFiles] = useState<File[]>([]);
+  const [batchResult, setBatchResult] = useState<BatchAnalysis | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchNote, setBatchNote] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
@@ -453,6 +458,32 @@ export default function App() {
             <div className="profile-warning">Profile discovery does not apply a transform. Verify camera model, gamut and transfer function before processing.</div>
           </section>
         </div>
+
+        <section className="card batch-analysis-card">
+          <div className="card-heading"><div><span className="section-kicker">SEQUENCE INTELLIGENCE</span><h2>Still Image Batch Analysis</h2></div><FileImage size={18} className="muted-icon" /></div>
+          <p className="lut-export-description">Compare a bounded sequence of still images. Each image is decoded and measured independently; adjacent RGB mean differences remain sample-domain diagnostics, not exposure matching.</p>
+          <div className="batch-controls">
+            <label className="lut-file-picker">SELECT IMAGE SEQUENCE<input type="file" accept="image/*,.exr,.dpx" multiple onChange={event => { setBatchFiles(Array.from(event.target.files || []).slice(0, 24)); setBatchResult(null); setBatchNote(""); }} /><span>{batchFiles.length ? batchFiles.length + " images selected" : "Choose up to 24 still images…"}</span></label>
+            <button type="button" className="primary-button" disabled={!apiOnline || batchBusy || batchFiles.length === 0 || batchFiles.length > 24} onClick={async () => {
+              setBatchBusy(true); setBatchResult(null); setBatchNote("Analyzing image sequence…");
+              try {
+                const body = new FormData(); batchFiles.forEach(item => body.append("files", item));
+                const response = await fetch(API_BASE + "/v1/media/batch-analyze?scope_standard=" + scopeStandard, { method: "POST", body });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Batch analysis failed");
+                setBatchResult(data as BatchAnalysis); setBatchNote("Sequence analysis complete.");
+              } catch (err) { setBatchNote(err instanceof Error ? err.message : "Batch analysis failed"); }
+              finally { setBatchBusy(false); }
+            }}>{batchBusy ? "Analyzing sequence…" : "Analyze sequence"}</button>
+          </div>
+          {batchNote && <div className="lut-export-note">{batchNote}</div>}
+          {batchResult && <div className="batch-results">
+            <div className="batch-result-heading"><b>{batchResult.image_count} IMAGES ANALYZED</b><span>ADJACENT SAMPLE-DOMAIN COMPARISON</span></div>
+            <div className="batch-image-list">{batchResult.images.map(item => <div className="batch-image-row" key={item.index}><b>{item.index + 1}. {item.filename}</b><span>{item.width} × {item.height}</span><small>R {item.channels.R.mean.toFixed(4)} · G {item.channels.G.mean.toFixed(4)} · B {item.channels.B.mean.toFixed(4)}</small></div>)}</div>
+            {batchResult.adjacent_comparisons.map(item => <div className="batch-delta-row" key={item.from_index}><b>{item.from_index + 1} → {item.to_index + 1}</b><span>ΔR {item.channel_mean_delta.R.toFixed(4)} · ΔG {item.channel_mean_delta.G.toFixed(4)} · ΔB {item.channel_mean_delta.B.toFixed(4)}</span></div>)}
+            <p>{batchResult.comparison_note}</p>
+          </div>}
+        </section>
 
         <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><button type="button" disabled={!analysis || busy} onClick={() => { if (scopeFrozen) { setScopeFrozen(false); setFrozenAnalysis(null); } else if (analysis) { setFrozenAnalysis(analysis); setScopeFrozen(true); } }}>{scopeFrozen ? "UNFREEZE" : "FREEZE"}</button><button type="button" disabled={!file || busy || !apiOnline} onClick={() => void refreshScopes(scopeStandard)}>REFRESH</button><span className="subtle-tag">{scopeFrozen ? "FROZEN SNAPSHOT" : scopeDisplayAnalysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
