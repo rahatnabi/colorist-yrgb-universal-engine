@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Aperture, AudioWaveform, CheckCircle2, ChevronDown, CircleHelp, Clapperboard, FileImage, Film, Gauge, ImagePlus, LoaderCircle, MonitorPlay, ScanSearch, Settings2, UploadCloud } from "lucide-react";
+import { Activity, Aperture, AudioWaveform, CheckCircle2, CircleHelp, Clapperboard, FileImage, Film, Gauge, LoaderCircle, MonitorPlay, ScanSearch, Settings2, UploadCloud } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
