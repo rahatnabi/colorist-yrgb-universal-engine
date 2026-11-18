@@ -284,7 +284,7 @@ export default function App() {
           <section className="card media-card">
             <div className="card-heading"><div><span className="section-kicker">SOURCE</span><h2>Media Input</h2></div><span className="subtle-tag">STILL IMAGES ONLY</span></div>
             <label className="drop-zone" htmlFor="media-file">
-              <input id="media-file" type="file" accept="image/*,.dng,.exr,.dpx,.cube" onChange={e => { const selected = e.target.files?.[0]; if (selected) void inspectMedia(selected); }} />
+              <input id="media-file" type="file" accept="image/*,.dng,.exr,.dpx" onChange={e => { const selected = e.target.files?.[0]; if (selected) void inspectMedia(selected); }} />
               <div className="upload-icon"><UploadCloud size={23} /></div><strong>Drop media here or <em>browse files</em></strong><span>RAW · TIFF · EXR · DPX · JPEG · PNG · WebP · Image sequences</span><span className="upload-limit">MAX UPLOAD 512 MB · SERVER TEMP FILE REMOVED AFTER PROBE</span>
             </label>
             {error && <div className="error-message">{error}</div>}
@@ -456,7 +456,7 @@ export default function App() {
                 </div>}
               </div>}
             </div>}
-            <div className="format-row"><span>SUPPORTED BY DECODER DEPENDENCIES</span><b>JPEG</b><b>PNG</b><b>TIFF</b><b>EXR</b><b>RAW*</b><b>PRORES*</b><small>* Optional decoder / codec support</small></div>
+            <div className="format-row"><span>SUPPORTED BY DECODER DEPENDENCIES</span><b>JPEG</b><b>PNG</b><b>TIFF</b><b>EXR</b><b>RAW*</b><small>* Optional still-image decoder support</small></div>
           </section>
 
           <section className="card profile-card">
