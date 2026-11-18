@@ -42,3 +42,16 @@ def test_media_analysis_contract_documents_non_equivalent_validation_states():
         "reference_validated",
     ):
         assert phrase in doc
+
+
+def test_pending_media_analysis_template_is_explicitly_unvalidated():
+    template = json.loads(
+        (ROOT / "data/footage_library/media_analysis_report.template.json").read_text()
+    )
+    assert template["report_state"] == "not_validated"
+    assert template["color_metadata"]["resolution_status"] == "unresolved"
+    assert all(
+        domain["status"] == "unavailable"
+        for domain in template["measurement_domains"].values()
+    )
+    assert template["reference_validation"]["status"] == "not_validated"
