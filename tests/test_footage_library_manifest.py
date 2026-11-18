@@ -41,7 +41,7 @@ def test_two_sony_clips_are_registered_independently_and_not_falsely_verified():
         assert metadata["camera_model"] == "ILME-FX30"
         assert metadata["codec"] == "AVC/H.264 (user-reported)"
         assert metadata["width"] == 3840 and metadata["height"] == 2160
-        assert metadata["chroma_subsampling"] == "4:2:2"
+        assert metadata["chroma_subsampling"] == "4:2:2 (reported)"
         assert metadata["frame_rate"] == "25/1 fps (25.00p)"
         assert metadata["transfer"] == "S-Log3"
         assert metadata["primaries"] == "S-Gamut3.Cine"
