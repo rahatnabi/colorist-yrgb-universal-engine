@@ -23,3 +23,17 @@ The caller must still declare the destination transfer function accurately. For 
 ## Current catalogue status
 
 The initial camera profile catalogue intentionally remains unverified. No manufacturer profile is promoted based on a successful OCIO execution alone. Each production profile needs its own camera/generation-specific reference vectors and validation record.
+
+
+## Registry integration
+
+A passing result exposes `to_registry_record()`. The returned audit fields can be stored under a profile's `validation` object together with the matching `transform_id`. The registry only reports `usable_for_transform=true` when all of the following are present:
+
+- profile status is `verified`,
+- a non-empty `transform_id`,
+- `validation.passed=true`,
+- a 64-character config SHA-256,
+- a non-empty reference-set ID,
+- a positive reference-vector count.
+
+The web profile discovery panel displays whether a profile has independent reference-validation evidence. It does not provide a button to self-certify a profile. Registry catalogue entries remain unverified until real reference sets are added and reviewed.
