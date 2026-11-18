@@ -1,8 +1,5 @@
 import pytest
 
-cv2 = pytest.importorskip("cv2")
-np = pytest.importorskip("numpy")
-
 from yrgb_engine.precision import PrecisionFrame
 from yrgb_engine.shot_comparison import align_and_compare
 
@@ -16,6 +13,8 @@ def _frame(rgb, name):
 
 
 def test_feature_alignment_registers_translated_and_rotated_still():
+    cv2 = pytest.importorskip("cv2")
+    np = pytest.importorskip("numpy")
     rng = np.random.default_rng(42)
     base = rng.random((420, 560, 3), dtype=np.float32)
     # Add stable high-contrast features so ORB has repeatable keypoints.
