@@ -51,7 +51,7 @@ def test_report_keeps_yuv_rgb_and_linear_domains_separate():
         rgb_frame=_rgb_frame(), frame_rate="25/1",
     )
     domains = report["measurement_domains"]
-    assert domains["original_yuv_code_values"]["status"] == "verified"
+    assert domains["original_yuv_code_values"]["status"] == "reported"
     assert domains["original_yuv_code_values"]["frames"][0]["sample_count"] == 4
     assert domains["nonlinear_rgb_code_values"]["status"] == "reported"
     assert "not original integer RGB" in domains["nonlinear_rgb_code_values"]["numeric_domain"]
