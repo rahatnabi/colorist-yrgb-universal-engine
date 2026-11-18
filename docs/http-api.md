@@ -109,3 +109,19 @@ another linear RGB set must supply appropriate coefficients. This endpoint
 does not decode camera Log, validate a camera transform or create a display
 output transform. Do not label a non-linear DaVinci Intermediate signal as
 linear RGB.
+
+
+## Scene-linear still look render
+
+`POST /v1/media/look-linear-exr` accepts multipart form data:
+`file`, `input_space_id`, `linear_input_confirmed=true`, and optional
+`settings_json`. It decodes via OpenImageIO, applies the parametric look and
+streams a float32 OpenEXR response. Values are not clamped; negative and
+above-one headroom are retained.
+
+This endpoint is deliberately restricted to source images the operator knows
+are scene-linear RGB in the selected space. It rejects recognized non-linear
+transfer metadata. Its output header explicitly reports
+`X-YRGB-Transform-Validated: false`: operator confirmation is not independent
+colorimetric validation. It does not convert camera Log, apply DWG/Intermediate
+or generate Rec.709 output. Install the `high-precision` extra to enable it.
