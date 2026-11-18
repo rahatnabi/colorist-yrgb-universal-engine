@@ -52,7 +52,7 @@ Object URLs are temporary and revoked when the selected image list changes or th
 
 ## Feature-based image alignment and reference comparison
 
-The `POST /v1/media/align-compare` endpoint accepts two still images: a reference and a candidate. It decodes both through the configured OpenImageIO adapter, detects ORB features, matches descriptors, and estimates a candidate-to-reference homography with RANSAC. It reports feature inliers, inlier ratio, overlap area, and the 3×3 transform matrix. The analysis raster is downscaled to a maximum dimension of 1280 pixels for registration and comparison.
+The `POST /v1/media/align-compare` endpoint accepts two still images: a reference and a candidate. It decodes both through the configured OpenImageIO adapter, detects ORB features, matches descriptors, and estimates a candidate-to-reference homography with RANSAC. It reports feature inliers, inlier ratio, overlap area, and the 3×3 transform matrix. It also returns a 50/50 reference/candidate overlay preview using a shared 1st–99th percentile sample-value scale; this is a diagnostic preview, not a color-managed rendering. The analysis raster is downscaled to a maximum dimension of 1280 pixels for registration and comparison.
 
 RGB comparison is calculated only over the warped overlap area. Per channel, the response reports reference mean, aligned candidate mean, candidate-minus-reference mean delta, mean absolute difference and root-mean-square difference. The operation is non-destructive; original uploaded files are not rewritten.
 
