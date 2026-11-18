@@ -17,3 +17,12 @@ This is a single-frame measurement endpoint, not a full temporal scan. The calle
 ## Bounded temporal sampling
 
 `POST /v1/media/video-temporal-report` decodes a bounded sequence of 1–24 timestamps. `start_seconds` and `interval_seconds` define sample positions. Each sample includes native YUV plane statistics and decoder RGB channel statistics; the two domains are not merged. The endpoint reports first-to-last mean deltas and maximum absolute step deltas as descriptive sample statistics only. These values are not exposure-drift, flicker, or scene-cut classifications. Source frame indices and timecode remain unresolved because this endpoint samples by timestamp only. Linear-light RGB remains unavailable without a validated per-pixel transform.
+
+
+## Sampled temporal diagnostics
+
+The bounded video-sample endpoint also returns per-shot, per-channel sample-mean
+trends. These are descriptive decoder-domain statistics, not exposure-stop or
+flicker measurements. See temporal-diagnostics.md for the metric definitions
+and validation limits. Flicker and exposure drift remain explicitly unavailable
+until dense fixed-ROI sampling and validated scene-linear RGB are available.
