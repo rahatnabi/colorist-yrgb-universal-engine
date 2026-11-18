@@ -15,15 +15,22 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function ScopePanel({ title, subtitle, icon, histogram, parades }: { title: string; subtitle: string; icon: React.ReactNode; histogram?: ScopeHistogram; parades?: Record<string, ScopeRaster> }) {
+function ScopePanel({ title, subtitle, icon, histograms, parades }: { title: string; subtitle: string; icon: React.ReactNode; histograms?: Record<string, ScopeHistogram>; parades?: Record<string, ScopeRaster> }) {
   const channels = ["R", "G", "B"] as const;
   const hasParade = !!parades && channels.every(channel => !!parades[channel]);
-  const hasSignal = !!histogram || hasParade;
-  const maxCount = histogram ? Math.max(1, ...histogram.counts) : 1;
+  const hasHistogram = !!histograms && channels.every(channel => !!histograms[channel]);
+  const hasSignal = hasHistogram || hasParade;
   return <section className="scope-panel">
     <div className="panel-head"><div className="panel-title">{icon}<span>{title}</span></div><span className="scope-state">{hasSignal ? "SAMPLE DATA" : "NO SIGNAL"}</span></div>
     <div className={"scope-screen" + (hasParade ? " rgb-parade-screen" : "")}><div className="scope-grid"><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
-      {histogram ? <div className="histogram-bars">{histogram.counts.map((count, index) => <i key={index} style={{ height: (Math.max(1, count / maxCount * 100)) + "%" }} />)}</div>
+      {hasHistogram ? <svg className="rgb-histogram" viewBox="0 0 128 100" preserveAspectRatio="none" role="img" aria-label="RGB channel histogram">
+        {channels.map(channel => {
+          const counts = histograms[channel].counts;
+          const peak = Math.max(1, ...counts);
+          const points = counts.map((count, index) => (index / Math.max(1, counts.length - 1) * 128) + "," + (96 - count / peak * 88)).join(" ");
+          return <polyline key={channel} className={"histogram-" + channel.toLowerCase()} points={points} />;
+        })}
+      </svg>
       : hasParade ? <div className="rgb-parade-bands">{channels.map(channel => {
         const raster = parades[channel];
         return <div className={"parade-band parade-" + channel.toLowerCase()} key={channel}>
@@ -35,7 +42,7 @@ function ScopePanel({ title, subtitle, icon, histogram, parades }: { title: stri
       })}</div>
       : <div className="scope-empty"><Activity size={19} /><span>Waiting for decoded frame</span></div>}
     </div>
-    <div className="scope-foot">{subtitle}{histogram ? " · under/over: " + histogram.underflow + "/" + histogram.overflow : hasParade ? " · R/G/B channels · source range under/over: " + channels.map(channel => parades[channel].underflow + "/" + parades[channel].overflow).join(" · ") : ""}</div>
+    <div className="scope-foot">{subtitle}{hasHistogram ? " · R/G/B · 128 bins · under/over R " + histograms.R.underflow + "/" + histograms.R.overflow + " · G " + histograms.G.underflow + "/" + histograms.G.overflow + " · B " + histograms.B.underflow + "/" + histograms.B.overflow : hasParade ? " · R/G/B channels · source range under/over: " + channels.map(channel => parades[channel].underflow + "/" + parades[channel].overflow).join(" · ") : ""}</div>
   </section>;
 }
 
@@ -192,7 +199,7 @@ export default function App() {
         <div className="scope-grid-layout">
           <ScopePanel title="Waveform" subtitle="Luma / RGB · explicit coefficients required" icon={<Activity size={15} />} />
           <ScopePanel title="RGB Parade" subtitle="Separate R / G / B channel density · decoded source values" icon={<AudioWaveform size={15} />} parades={analysis?.analysis.rgb_parade} />
-          <ScopePanel title="Histogram" subtitle="R channel · 128 bins · code-value range 0–1" icon={<Gauge size={15} />} histogram={analysis?.analysis.histograms.R} />
+          <ScopePanel title="RGB Histogram" subtitle="Overlaid R / G / B distributions · source code-value range 0–1" icon={<Gauge size={15} />} histograms={analysis?.analysis.histograms} />
           <ScopePanel title="Vectorscope" subtitle="Cb / Cr · explicit matrix required" icon={<Aperture size={15} />} />
         </div>
         <div className="bottom-disclaimer"><span>ENGINE NOTE</span> Browser preview is not a color-managed reference display. Histogram and parade show decoded source sample values only. No camera transform, IRE scale, luminance interpretation or calibrated vectorscope is inferred.</div>
