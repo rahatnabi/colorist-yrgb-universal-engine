@@ -65,3 +65,14 @@ This is bounded sampling, not real-time playback or a full-frame-rate scan.
 Histogram changes are candidates, not confirmed semantic cuts. Channel mean
 deltas remain in the source sample domain and are not exposure-stop measurements.
 The upload remains limited to 512 MiB and each decoded frame to 40 MP.
+
+
+## LUT export
+
+`POST /v1/lut/export?size=35&title=My%20Look` accepts an uploaded source
+`.cube` file and returns a resampled 3D `.cube` download. Supported target
+grid sizes are 17, 33, 35 and 65. The endpoint preserves the source LUT domain
+and evaluates its existing 1D/3D/combined transform while resampling. Resampling
+does not create new look detail beyond the source LUT. The .cube format does not
+reliably carry a color-space contract, so users must keep track of the intended
+input and output color spaces separately.
