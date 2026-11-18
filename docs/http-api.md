@@ -23,6 +23,12 @@ OpenAPI documentation is available at `/docs` while the server is running.
   encoding, gamut and camera model. This endpoint never chooses a transform.
 - `POST /v1/media/probe` — upload a media file for conservative signature and
   metadata probing. The upload is limited to 512 MiB and removed after probing.
+- `POST /v1/media/analyze` — decode a still image with the optional OpenImageIO
+  adapter and return RGB channel statistics, a 128-bin histogram and RGB parade
+  raster. Uploads are limited to 512 MiB; decoded frames are limited to 40 MP.
+  Measurements remain in the decoder's sample domain; no camera transform, IRE,
+  luminance, waveform or vectorscope interpretation is inferred. Install the
+  `high-precision` extra to enable this endpoint.
 
 ## Important boundaries
 
