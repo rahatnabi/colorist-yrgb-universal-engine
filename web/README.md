@@ -38,3 +38,8 @@ Open http://localhost:5173. Set `VITE_YRGB_API_URL` when the API is hosted elsew
 The UI does not fabricate scope data or apply unverified input transforms.
 
 Temporal video sampling: the Media Analysis workspace can sample 1–24 evenly spaced frames from a clip and report adjacent-frame histogram-change candidates. These are statistical candidates, not confirmed scene cuts.
+
+
+### Reference-gated transform preview
+
+The Camera Profile panel lets you select an exact registry candidate. For still images and a selected video timestamp, the preview action calls the reference-gated transform preview endpoint. Unverified profiles are deliberately blocked with an API conflict response; the UI never falls back to a guessed camera transform. The rendered PNG is a preview only, not a color-managed mastering reference or final delivery.
