@@ -82,6 +82,10 @@ export default function App() {
   const [batchResult, setBatchResult] = useState<BatchAnalysis | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchNote, setBatchNote] = useState("");
+  const [batchPreviewUrls, setBatchPreviewUrls] = useState<Record<number, string>>({});
+  const [compareA, setCompareA] = useState(0);
+  const [compareB, setCompareB] = useState(1);
+  const [compareTarget, setCompareTarget] = useState<"A" | "B">("A");
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
@@ -100,6 +104,11 @@ export default function App() {
   const roiDragStart = useRef<{ x: number; y: number } | null>(null);
   const [frozenAnalysis, setFrozenAnalysis] = useState<AnalysisResponse | null>(null);
   const scopeDisplayAnalysis = useMemo(() => scopeFrozen && frozenAnalysis ? frozenAnalysis : analysis, [scopeFrozen, frozenAnalysis, analysis]);
+  useEffect(() => {
+    const urls = batchFiles.map(file => URL.createObjectURL(file));
+    setBatchPreviewUrls(Object.fromEntries(urls.map((url, index) => [index, url])));
+    return () => urls.forEach(url => URL.revokeObjectURL(url));
+  }, [batchFiles]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [manufacturer, setManufacturer] = useState("Sony");
@@ -478,10 +487,21 @@ export default function App() {
             }}>{batchBusy ? "Analyzing sequence…" : "Analyze sequence"}</button>
           </div>
           {batchNote && <div className="lut-export-note">{batchNote}</div>}
+          {batchFiles.length > 0 && <div className="contact-sheet-workspace">
+            <div className="contact-sheet-heading"><b>CONTACT SHEET</b><span>{batchFiles.length} SELECTED · LOCAL PREVIEWS</span></div>
+            <div className="contact-sheet-grid">{batchFiles.map((item, index) => <button type="button" key={index} className={`contact-sheet-tile ${compareA === index ? "selected-a" : ""} ${compareB === index ? "selected-b" : ""}`} onClick={() => compareTarget === "A" ? setCompareA(index) : setCompareB(index)} title={`Set image ${index + 1} as comparison ${compareTarget}`}>
+              {batchPreviewUrls[index] ? <img src={batchPreviewUrls[index]} alt={item.name} loading="lazy" /> : <span className="contact-sheet-placeholder">{item.name.split(".").pop()?.toUpperCase() || "IMAGE"}</span>}
+              <span className="contact-sheet-caption"><b>{index + 1}. {item.name}</b><small>{formatBytes(item.size)}</small></span>
+              {(compareA === index || compareB === index) && <i>{compareA === index ? "A" : ""}{compareA === index && compareB === index ? " / " : ""}{compareB === index ? "B" : ""}</i>}
+            </button>)}</div>
+            <div className="shot-compare-toolbar"><b>SHOT COMPARISON</b><span>Click a thumbnail to assign it to:</span><button type="button" className={compareTarget === "A" ? "active" : ""} onClick={() => setCompareTarget("A")}>IMAGE A</button><button type="button" className={compareTarget === "B" ? "active" : ""} onClick={() => setCompareTarget("B")}>IMAGE B</button></div>
+            <div className="shot-compare-selects"><label>IMAGE A<select value={compareA} onChange={e => setCompareA(Number(e.target.value))}>{batchFiles.map((item,index)=><option key={index} value={index}>{index+1}. {item.name}</option>)}</select></label><label>IMAGE B<select value={compareB} onChange={e => setCompareB(Number(e.target.value))}>{batchFiles.map((item,index)=><option key={index} value={index}>{index+1}. {item.name}</option>)}</select></label></div>
+            <div className="shot-compare-view">{[compareA,compareB].map((index,slot)=><div className="shot-compare-pane" key={slot}><div className="shot-compare-label">IMAGE {slot===0?"A":"B"} · {batchFiles[index]?.name}</div>{batchPreviewUrls[index] ? <img src={batchPreviewUrls[index]} alt={batchFiles[index]?.name} /> : <div className="contact-sheet-placeholder large">Preview not available in browser for this format</div>}</div>)}</div>
+            {batchResult && compareA !== compareB && <div className="shot-compare-metrics"><b>DECODED SAMPLE MEAN DIFFERENCE · B − A</b>{(["R","G","B"] as const).map(channel=>{const a=batchResult.images[compareA]?.channels[channel]?.mean;const b=batchResult.images[compareB]?.channels[channel]?.mean;return <span key={channel}>{channel}: {a===undefined||b===undefined?"—":(b-a>=0?"+":"")+(b-a).toFixed(5)}</span>})}</div>}
+          </div>}
           {batchResult && <div className="batch-results">
-            <div className="batch-result-heading"><b>{batchResult.image_count} IMAGES ANALYZED</b><span>ADJACENT SAMPLE-DOMAIN COMPARISON</span></div>
+            <div className="batch-result-heading"><b>{batchResult.image_count} IMAGES ANALYZED</b><span>DECODED SAMPLE-DOMAIN STATISTICS</span></div>
             <div className="batch-image-list">{batchResult.images.map(item => <div className="batch-image-row" key={item.index}><b>{item.index + 1}. {item.filename}</b><span>{item.width} × {item.height}</span><small>R {item.channels.R.mean.toFixed(4)} · G {item.channels.G.mean.toFixed(4)} · B {item.channels.B.mean.toFixed(4)}</small></div>)}</div>
-            {batchResult.adjacent_comparisons.map(item => <div className="batch-delta-row" key={item.from_index}><b>{item.from_index + 1} → {item.to_index + 1}</b><span>ΔR {item.channel_mean_delta.R.toFixed(4)} · ΔG {item.channel_mean_delta.G.toFixed(4)} · ΔB {item.channel_mean_delta.B.toFixed(4)}</span></div>)}
             <p>{batchResult.comparison_note}</p>
           </div>}
         </section>
