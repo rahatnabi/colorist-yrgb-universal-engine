@@ -68,11 +68,11 @@ The report records each file independently. A video may report `probe_unavailabl
 
 ## First intake candidate: Sony S-Log3 / S-Gamut3.Cine
 
-The user supplied a Google Drive folder link and identified the clips as Sony S-Log3.Cine. The initial folder listing was reported to contain:
-- `C1382.MP4`
-- `C1382M01.XML`
-- `C1383.MP4`
-- `C1383M01.XML`
+The user supplied a Google Drive folder link and identified the clips as Sony S-Log3.Cine. The initial folder listing was reported to contain two separately registered camera-original clips and their sidecars:
+- Clip 1: `C1382.MP4` + `C1382M01.XML`
+- Clip 2: `C1383.MP4` + `C1383M01.XML`
+
+Each clip has its own manifest record (`sony-slog3cine-c1382` and `sony-slog3cine-c1383`) so checksums, probe reports, metadata review, and later screenshot annotations can be tracked independently.
 
 **Important:** these names and the user-declared profile are intake leads, not verified media metadata. The actual media bytes have not yet been imported or hashed by this repository. The exact camera model, recording mode, codec, bit depth, frame rate, firmware, and embedded color tags remain unverified until the MP4 and XML bytes can be read.
 
