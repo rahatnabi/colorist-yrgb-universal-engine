@@ -1,8 +1,11 @@
 import hashlib
+import sys
+from pathlib import Path
 
 import pytest
 
-from scripts.fetch_openexr_fixture import FIXTURES, fetch_fixture, git_blob_sha1
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from fetch_openexr_fixture import FIXTURES, fetch_fixture, git_blob_sha1
 
 
 def test_git_blob_sha1_uses_git_object_header():
@@ -53,6 +56,7 @@ def test_fetch_fixture_does_not_write_checksum_mismatch(tmp_path, monkeypatch):
             return False
         def read(self, _limit):
             return payload
+
     monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs: Response())
     destination = tmp_path / "bad.exr"
     with pytest.raises(RuntimeError, match="Unexpected fixture size"):
