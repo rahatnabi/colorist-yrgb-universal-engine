@@ -294,6 +294,13 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       body.append("temperature_shift", String(settings.temperature_shift));
       body.append("tint_shift", String(settings.tint_shift));
       body.append("curve_midpoint", String(curveMidpoint));
+      const includeDeliveryQc = roi.width * roi.height >= 16;
+      if (includeDeliveryQc) {
+        body.append("roi_x", String(roi.x));
+        body.append("roi_y", String(roi.y));
+        body.append("roi_width", String(roi.width));
+        body.append("roi_height", String(roi.height));
+      }
       const response = await fetch(apiBase + "/v1/media/native-grade-export", { method: "POST", body });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
@@ -311,7 +318,9 @@ export default function InteractiveGradingPreview({ sourceUrl, filename, setting
       const digest = response.headers.get("X-YRGB-Float-Samples-SHA256") || "not supplied";
       const roundtripVerified = response.headers.get("X-YRGB-Roundtrip-Verified") === "true";
       const roundtripError = response.headers.get("X-YRGB-Roundtrip-Max-Absolute-Error") || "unknown";
-      setMasterStatus("Full-resolution float32 " + masterFormat.toUpperCase() + " exported · " + width + " × " + height + " · unclamped · round-trip " + (roundtripVerified ? "VERIFIED" : "status unavailable") + " · max error " + roundtripError + " · sample SHA-256 " + digest.slice(0, 16) + "…");
+      const deliveryQc = response.headers.get("X-YRGB-Delivery-QC-Status") || "not_requested";
+      const accuracyScore = response.headers.get("X-YRGB-Correction-Accuracy-Score");
+      setMasterStatus("Full-resolution float32 " + masterFormat.toUpperCase() + " exported · " + width + " × " + height + " · unclamped · round-trip " + (roundtripVerified ? "VERIFIED" : "status unavailable") + " · delivery QC " + deliveryQc.toUpperCase() + (accuracyScore ? " · Correction Accuracy " + Number(accuracyScore).toFixed(1) : "") + " · max error " + roundtripError + " · sample SHA-256 " + digest.slice(0, 16) + "…");
     } catch (error) {
       setMasterStatus(error instanceof Error ? error.message : "Native master export failed.");
     } finally {
