@@ -1233,9 +1233,9 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         file: UploadFile = File(...),
         profile_id: str = Form(..., min_length=1, max_length=160),
         camera_model: str | None = Form(default=None, max_length=120),
-        exposure_stops: float = Form(default=0.0, ge=-10.0, le=10.0),
+        exposure_stops: float = Form(default=0.0, ge=-8.0, le=8.0),
         contrast: float = Form(default=1.0, ge=0.0, le=3.0),
-        pivot: float = Form(default=0.18, gt=0.0, le=4.0),
+        pivot: float = Form(default=0.18, ge=0.001, le=1.0),
         saturation: float = Form(default=1.0, ge=0.0, le=3.0),
         temperature_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
         tint_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
@@ -1246,7 +1246,8 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
         The returned PNG is a display preview, not a full-resolution float master.
         """
         from dataclasses import replace
-        from .native_grading import NativeGradeSettings, NativeGradingError, apply_native_grade
+        from .grading_pipeline import GradingPipelineError, process_validated_still
+        from .look import LookSettings
         from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
         from .ocio import transform_frame
         from .preview import PreviewRenderError, save_preview_png
@@ -1298,34 +1299,30 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 metadata={**frame.metadata, "yrgb_selected_camera_profile": profile_id},
             )
             try:
-                working_frame = await run_in_threadpool(
-                    prepare_frame_for_working_space, frame,
-                    registry=profile_registry, config_path=config_value,
+                coefficients = (
+                    (0.2722287, 0.6740818, 0.0536895)
+                    if "aces" in working_space.casefold()
+                    else (0.2126, 0.7152, 0.0722)
                 )
-                grade = NativeGradeSettings(
+                grade = LookSettings(
                     exposure_stops=exposure_stops, contrast=contrast, pivot=pivot,
                     saturation=saturation, temperature_shift=temperature_shift,
-                    tint_shift=tint_shift, curve_midpoint=curve_midpoint,
+                    tint_shift=tint_shift, luminance_coefficients=coefficients,
+                    master_curve=((0.0, 0.0), (0.5, curve_midpoint), (1.0, 1.0)),
                 )
-                graded_frame = await run_in_threadpool(
-                    apply_native_grade, working_frame, grade, working_space_id=working_space,
+                result = await run_in_threadpool(
+                    process_validated_still,
+                    frame,
+                    grade,
+                    registry=profile_registry,
+                    config_path=config_value,
+                    working_space_id=working_space,
+                    display_space_id=preview_space,
+                    display_transfer=preview_transfer,
+                    display_primaries=preview_primaries,
                 )
-                display_frame = await run_in_threadpool(
-                    transform_frame, graded_frame, source_space=working_space,
-                    destination_space=preview_space, config_path=config_value,
-                )
-                display_frame = replace(
-                    display_frame,
-                    encoding=replace(
-                        display_frame.encoding, primaries=preview_primaries,
-                        transfer=preview_transfer, profile_id=preview_space,
-                        working_space_id=preview_space, transform_id=None,
-                        validated=False,
-                        metadata_source="preview-only OCIO display transform; not delivery validated",
-                    ),
-                    metadata={**display_frame.metadata, "yrgb_preview_only": True},
-                )
-            except (TransformValidationError, NativeGradingError) as exc:
+                display_frame = result.display_preview_frame
+            except GradingPipelineError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
             except Exception as exc:
                 raise HTTPException(status_code=422, detail=f"Native still grading failed: {exc}") from exc
