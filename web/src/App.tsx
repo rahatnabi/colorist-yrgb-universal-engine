@@ -5,7 +5,7 @@ const API_BASE = import.meta.env.VITE_YRGB_API_URL || "http://localhost:8000";
 
 type Probe = { detected_type?: string; status?: string; signature?: string; warnings?: string[]; metadata?: Record<string, unknown> };
 type ProbeResponse = { filename: string; size_bytes: number; probe: Probe };
-type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; camera_models?: string[] };
+type Profile = { id: string; manufacturer: string; encoding: string; gamut?: string; status: string; usable_for_transform?: boolean; validation_status?: string; resolution_note?: string; camera_models?: string[] };
 type ScopeHistogram = { counts: number[]; minimum: number; maximum: number; underflow: number; overflow: number };
 type ScopeRaster = { counts: number[][]; width: number; height: number; minimum: number; maximum: number; underflow: number; overflow: number };
 type AnalysisResponse = { width: number; height: number; decoder: string; timestamp_seconds?: number; sample_domain: string; analysis: { histograms: Record<string, ScopeHistogram>; rgb_parade: Record<string, ScopeRaster>; note: string } };
@@ -246,7 +246,7 @@ export default function App() {
               <button className="primary-button" type="submit" disabled={!apiOnline}><ScanSearch size={15} /> Find exact candidates</button>
             </form>
             {profileNote && <p className="profile-note">{profileNote}</p>}
-            {profiles.map(profile => <div className="profile-result" key={profile.id}><div><b>{profile.encoding} · {profile.gamut || "Gamut unspecified"}</b><small>{profile.manufacturer} / {profile.id}</small></div><span className={profile.usable_for_transform ? "verified" : "unverified"}>{profile.status}</span></div>)}
+            {profiles.map(profile => <div className="profile-result" key={profile.id}><div><b>{profile.encoding} · {profile.gamut || "Gamut unspecified"}</b><small>{profile.manufacturer} / {profile.id}</small></div><span className={profile.usable_for_transform ? "verified" : "unverified"}>{profile.usable_for_transform ? "REFERENCE VALIDATED" : "NOT VALIDATED"}</span><small className="profile-validation-note">{profile.validation_status || "not_reference_validated"} · {profile.resolution_note || "No independent validation record."}</small></div>)}
             <div className="profile-warning">Profile discovery does not apply a transform. Verify camera model, gamut and transfer function before processing.</div>
           </section>
         </div>
