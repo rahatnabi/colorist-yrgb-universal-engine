@@ -8,5 +8,10 @@
   "reference_source": "",
   "measurement_method": "",
   "notes": "Template only. Populate vectors from traceable independent camera/reference measurements. Do not use synthetic identity values.",
-  "vectors": []
+  "vectors": [],
+  "camera_model": "",
+  "recording_mode": "",
+  "codec": "",
+  "bit_depth": null,
+  "firmware_version": ""
 }
