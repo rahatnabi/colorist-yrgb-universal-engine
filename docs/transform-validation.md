@@ -111,3 +111,6 @@ The command checks that manifest profile/transform/space names exactly match the
 A passing report is a candidate audit artifact, not automatic approval. A reviewer must inspect the reference provenance, capture metadata, vector coverage, tolerance, and transform behavior before adding the report to the profile's `validation` record and changing its status to `verified`. The tool never edits the registry or enables a camera transform automatically.
 
 The official ACES v4.0.0 release identifies the Studio config as an OCIO 2.5 config and lists the Sony S-Log3 / S-Gamut3.Cine and DaVinci Intermediate WideGamut spaces. It also notes DJI D-Log / D-Gamut transform support. Space-name availability is a compatibility check, not independent camera validation. See the [official ACES config release](https://github.com/AcademySoftwareFoundation/OpenColorIO-Config-ACES/releases/tag/v4.0.0).
+
+
+Reference manifests also require exact camera model, recording mode, codec, and bit depth. Firmware version is an optional traceability field. This prevents a measured vector set from being silently reused across materially different camera modes or encodings.
