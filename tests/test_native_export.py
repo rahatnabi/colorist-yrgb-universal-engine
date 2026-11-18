@@ -73,3 +73,62 @@ def test_native_export_requires_graded_still_purpose():
     frame = make_grade(purpose="display_preview_only")
     with pytest.raises(NativeExportError, match="graded still"):
         validate_native_export_frame(frame)
+
+
+def test_roundtrip_verifier_accepts_exact_float32_readback(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    import numpy as np
+    from yrgb_engine.native_export import verify_native_float_export
+
+    frame = make_grade()
+    output = tmp_path / "fixture.exr"
+    output.write_bytes(b"fixture")
+    class FakeInput:
+        def spec(self):
+            return SimpleNamespace(
+                width=frame.width, height=frame.height,
+                nchannels=frame.channel_count, channelnames=list(frame.channel_names),
+            )
+        def read_image(self, format=None):
+            return np.asarray(frame.samples, dtype=np.float32).reshape(
+                frame.height, frame.width, frame.channel_count
+            )
+        def close(self):
+            pass
+    fake_oiio = SimpleNamespace(FLOAT="float", ImageInput=SimpleNamespace(open=lambda _path: FakeInput()))
+    monkeypatch.setitem(sys.modules, "OpenImageIO", fake_oiio)
+    report = verify_native_float_export(frame, output)
+    assert report["verified"] is True
+    assert report["mismatch_count"] == 0
+    assert report["max_absolute_error"] == 0.0
+    assert report["sample_sha256_matches"] is True
+
+
+def test_roundtrip_verifier_rejects_changed_float_samples(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    import numpy as np
+    from yrgb_engine.native_export import verify_native_float_export
+
+    frame = make_grade()
+    output = tmp_path / "changed.exr"
+    output.write_bytes(b"fixture")
+    changed = np.asarray(frame.samples, dtype=np.float32).reshape(
+        frame.height, frame.width, frame.channel_count
+    ).copy()
+    changed[0, 0, 0] += 0.1
+    class FakeInput:
+        def spec(self):
+            return SimpleNamespace(
+                width=frame.width, height=frame.height,
+                nchannels=frame.channel_count, channelnames=list(frame.channel_names),
+            )
+        def read_image(self, format=None):
+            return changed
+        def close(self):
+            pass
+    fake_oiio = SimpleNamespace(FLOAT="float", ImageInput=SimpleNamespace(open=lambda _path: FakeInput()))
+    monkeypatch.setitem(sys.modules, "OpenImageIO", fake_oiio)
+    with pytest.raises(NativeExportError, match="round-trip failed"):
+        verify_native_float_export(frame, output)
