@@ -81,3 +81,16 @@ The native float decoder/exporter requires OpenImageIO and NumPy. Actual TIFF/Op
 - `web/` — React/Vite interactive grading school interface.
 - `tests/` — numerical, API and integration contract tests.
 - `docs/` — architecture, validation and workflow documentation.
+
+## Still-image learning catalogue
+
+The first read-only learning API is available on the still-image product path:
+
+- `GET /v1/learning/curriculum` — beginner, intermediate and advanced lessons.
+- `GET /v1/learning/exercises` — guided and independent still-image exercises; filter with `?level=beginner`, `intermediate` or `advanced`.
+- `GET /v1/learning/lessons/{lesson_id}` — retrieve one lesson.
+- `GET /v1/learning/exercises/{exercise_id}` — retrieve one exercise.
+
+The catalogue currently defines nine lessons and three starter exercises. Exercise target values are instructional examples, not measured camera reference data. Learner progress persistence, downloadable practice stills and submission UI are not yet implemented.
+
+**Assessment remains split:** Correction Accuracy is an objective exercise-target technical measurement and stays NOT SCORED when validation evidence is missing. Creative Look Similarity is a separate perceptual comparison against a designated creative still. These scores are never combined.
