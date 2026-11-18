@@ -285,7 +285,10 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             from .video_precision import decode_video_float_frame
             from .timeline import iter_analyze_video_frames
 
-            def analyze_sample() -> list[dict[str, Any]]:
+            if start_seconds + (frame_count - 1) * interval_seconds > 86400.0:
+                raise HTTPException(status_code=422, detail="Requested sample timestamps exceed the 86400-second limit.")
+
+            def analyze_sample() -> dict[str, Any]:
                 def decoded_frames():
                     for index in range(frame_count):
                         timestamp = start_seconds + index * interval_seconds
@@ -303,7 +306,6 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                     },
                 )
                 output = []
-                signals = []
                 for report in reports:
                     output.append({
                         "timestamp_seconds": report.timestamp_seconds,
