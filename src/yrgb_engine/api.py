@@ -1228,6 +1228,169 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
                 Path(preview_path).unlink(missing_ok=True)
 
 
+    @app.post("/v1/media/native-measurements")
+    async def media_native_measurements(
+        file: UploadFile = File(...),
+        profile_id: str = Form(..., min_length=1, max_length=160),
+        roi_x: int = Form(..., ge=0),
+        roi_y: int = Form(..., ge=0),
+        roi_width: int = Form(..., gt=0),
+        roi_height: int = Form(..., gt=0),
+        camera_model: str | None = Form(default=None, max_length=120),
+        exposure_stops: float = Form(default=0.0, ge=-8.0, le=8.0),
+        contrast: float = Form(default=1.0, ge=0.0, le=3.0),
+        pivot: float = Form(default=0.18, ge=0.001, le=1.0),
+        saturation: float = Form(default=1.0, ge=0.0, le=3.0),
+        temperature_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        tint_shift: float = Form(default=0.0, ge=-1.0, le=1.0),
+        curve_midpoint: float = Form(default=0.5, ge=0.1, le=0.9),
+        exposure_target_stops: float = Form(default=0.0, ge=-8.0, le=8.0),
+        gray_reference: float = Form(default=0.18, gt=0.0, le=1.0),
+        exposure_tolerance_stops: float = Form(default=0.15, ge=0.0, le=4.0),
+        neutral_tolerance: float = Form(default=0.02, ge=0.0, le=1.0),
+        white_balance_tolerance: float = Form(default=0.02, ge=0.0, le=1.0),
+    ) -> dict[str, Any]:
+        """Measure scopes and correction accuracy from the same native graded still."""
+        from dataclasses import replace
+        from .accuracy import AccuracyTarget, measure_correction_accuracy
+        from .correction_report import build_correction_accuracy_report
+        from .exposure import PixelRegion
+        from .grading_pipeline import GradingPipelineError, process_validated_still
+        from .look import LookSettings
+        from .oiio_decoder import HighPrecisionDecodeError, decode_oiio_float
+        from .scopes import ScopeConfig, build_scope_snapshot
+
+        profile = profile_registry.get_by_id(profile_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Selected camera profile is not in the registry.")
+        if not profile.get("usable_for_transform"):
+            raise HTTPException(status_code=409, detail="Selected camera profile is not reference-validated; native measurements are blocked.")
+        required_models = profile.get("camera_models", [])
+        if required_models and (
+            not camera_model
+            or not any(camera_model.casefold() == model.casefold() for model in required_models)
+        ):
+            raise HTTPException(status_code=422, detail="Select the exact supported camera model for this profile.")
+        config_value = os.getenv("YRGB_OCIO_CONFIG", "").strip()
+        preview_space = os.getenv("YRGB_PREVIEW_SPACE", "").strip()
+        preview_transfer = os.getenv("YRGB_PREVIEW_TRANSFER", "").strip()
+        preview_primaries = os.getenv("YRGB_PREVIEW_PRIMARIES", "").strip()
+        working_space = str(profile.get("ocio_destination_space", ""))
+        if not all((config_value, preview_space, preview_transfer, preview_primaries, working_space)):
+            raise HTTPException(status_code=503, detail="Configure the pinned OCIO config and preview output settings on the server.")
+
+        filename = Path(file.filename or "still.tif").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-measure-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds the 512 MiB limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded still image is empty.")
+            try:
+                frame = await run_in_threadpool(decode_oiio_float, temporary_path)
+            except HighPrecisionDecodeError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            if frame.width * frame.height > 40_000_000:
+                raise HTTPException(status_code=413, detail="Decoded still exceeds the 40 megapixel limit.")
+            if roi_x + roi_width > frame.width or roi_y + roi_height > frame.height:
+                raise HTTPException(status_code=422, detail="Neutral ROI must lie entirely inside the decoded still.")
+
+            frame = replace(
+                frame,
+                encoding=replace(frame.encoding, profile_id=profile_id),
+                metadata={**frame.metadata, "yrgb_selected_camera_profile": profile_id},
+            )
+            coefficients = (
+                (0.2722287, 0.6740818, 0.0536895)
+                if "aces" in working_space.casefold()
+                else (0.2126, 0.7152, 0.0722)
+            )
+            settings = LookSettings(
+                exposure_stops=exposure_stops, contrast=contrast, pivot=pivot,
+                saturation=saturation, temperature_shift=temperature_shift,
+                tint_shift=tint_shift, luminance_coefficients=coefficients,
+                master_curve=((0.0, 0.0), (0.5, curve_midpoint), (1.0, 1.0)),
+            )
+            try:
+                result = await run_in_threadpool(
+                    process_validated_still,
+                    frame,
+                    settings,
+                    registry=profile_registry,
+                    config_path=config_value,
+                    working_space_id=working_space,
+                    display_space_id=preview_space,
+                    display_transfer=preview_transfer,
+                    display_primaries=preview_primaries,
+                )
+                graded = result.graded_frame
+                region = PixelRegion(roi_x, roi_y, roi_width, roi_height)
+                accuracy_target = AccuracyTarget(
+                    exposure_stops=exposure_target_stops,
+                    exposure_tolerance_stops=exposure_tolerance_stops,
+                    gray_reference=gray_reference,
+                    neutral_tolerance=neutral_tolerance,
+                    white_balance_tolerance=white_balance_tolerance,
+                    luminance_coefficients=coefficients,
+                )
+                accuracy = await run_in_threadpool(
+                    measure_correction_accuracy, graded, region, accuracy_target
+                )
+                report = build_correction_accuracy_report(accuracy, accuracy_target)
+                scope_config = ScopeConfig(
+                    value_range=(-0.25, 4.0),
+                    histogram_bins=256,
+                    raster_width=512,
+                    raster_height=256,
+                    waveform_coefficients=coefficients,
+                    vectorscope_coefficients=coefficients,
+                    clipping_thresholds=(0.0, 1.0),
+                )
+                scopes = await run_in_threadpool(
+                    build_scope_snapshot, graded, scope_config
+                )
+            except GradingPipelineError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=422, detail=f"Native measurement failed: {exc}") from exc
+
+            return {
+                "filename": filename,
+                "measurement_source": "same_validated_native_graded_float32_frame",
+                "working_space_id": graded.encoding.working_space_id,
+                "transform_id": graded.encoding.transform_id,
+                "validated": graded.encoding.validated,
+                "transfer": graded.encoding.transfer,
+                "frame": {"width": graded.width, "height": graded.height, "sample_count": graded.width * graded.height},
+                "roi": {"x": roi_x, "y": roi_y, "width": roi_width, "height": roi_height},
+                "scope_axis": "linear working-space sample values; not IRE or nits",
+                "scope_range": [-0.25, 4.0],
+                "scopes": scopes.to_payload(),
+                "correction_accuracy": report.to_dict(),
+                "limitations": [
+                    "The neutral ROI is learner-selected and must genuinely represent a neutral reference.",
+                    "Scope values are linear working-space samples, not display-referred IRE or calibrated nits.",
+                    "Clipping counts use explicit linear thresholds 0.0 and 1.0; values above 1.0 are retained as scene headroom.",
+                    "No creative-look similarity score is calculated by this endpoint.",
+                ],
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
+
     @app.post("/v1/media/native-grade-preview")
     async def media_native_grade_preview(
         file: UploadFile = File(...),
