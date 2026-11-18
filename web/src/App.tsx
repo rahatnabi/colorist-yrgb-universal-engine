@@ -96,6 +96,7 @@ export default function App() {
   const [alignmentNote, setAlignmentNote] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [probe, setProbe] = useState<ProbeResponse | null>(null);
+  const [sidecarMetadata, setSidecarMetadata] = useState<Record<string, string>>({});
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analysisNote, setAnalysisNote] = useState("");
   const [scopeStandard, setScopeStandard] = useState<"bt709" | "bt2020">("bt709");
@@ -167,7 +168,7 @@ export default function App() {
 
   async function inspectMedia(selected: File) {
     if (!(selected.type.startsWith("image/") || /\.(dng|tif|tiff|exr|dpx|png|jpe?g|bmp|webp|heic|heif)$/i.test(selected.name))) { setError("COLORIST YRGB is a still-image-only workspace. Please select an image file."); return; }
-    setFile(selected); setProbe(null); setCaptureMatch(null); setAnalysis(null); setScopeFrozen(false); setFrozenAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
+    setFile(selected); setProbe(null); setSidecarMetadata({}); setCaptureMatch(null); setAnalysis(null); setScopeFrozen(false); setFrozenAnalysis(null); setSampleReport(null); setDenseReport(null); setAnalysisNote(""); setFrameTimestamp("0"); setError(""); setSelectedProfileId(""); setTransformPreviewNote(""); if (transformPreviewUrl) URL.revokeObjectURL(transformPreviewUrl); setTransformPreviewUrl(""); setBusy(true);
     try {
       const body = new FormData(); body.append("file", selected);
       const response = await fetch(`${API_BASE}/v1/media/probe`, { method: "POST", body });
@@ -344,11 +345,11 @@ export default function App() {
                 const fields: [string, unknown][] = [
                   ["Camera make", capture.camera_make], ["Camera model", capture.camera_model],
                   ["Recording mode", capture.recording_mode], ["Lens", capture.lens_model],
-                  ["Gamma / transfer", capture.color_transfer || capture.gamma],
-                  ["Color primaries / gamut", capture.color_primaries || capture.gamut],
+                  ["Gamma / transfer", capture.color_transfer || capture.gamma || capture.gamma_curve],
+                  ["Color primaries / gamut", capture.color_primaries || capture.gamut || capture.color_space],
                   ["Codec", capture.codec], ["Bit depth", capture.bit_depth],
                   ["ISO", capture.iso], ["Shutter", capture.shutter_speed],
-                  ["Aperture", capture.aperture], ["White balance", capture.white_balance],
+                  ["Aperture", capture.aperture], ["Focal length", capture.focal_length_mm], ["White balance", capture.white_balance],
                   ["Capture date", capture.capture_datetime], ["Firmware", capture.firmware_version],
                   ["Image dimensions", metadata.width && metadata.height ? String(metadata.width) + " × " + String(metadata.height) : undefined],
                   ["Pixel mode", metadata.mode], ["ICC profile", metadata.icc_profile_present === true ? "Embedded" : metadata.icc_profile_present === false ? "Not embedded" : undefined],
@@ -358,6 +359,23 @@ export default function App() {
                   <div className="camera-metadata-heading"><b>CAMERA METADATA</b><span>{available.length} REPORTED FIELDS</span></div>
                   {available.length ? <div className="camera-metadata-grid">{available.map(([label, value]) => <div key={label}><small>{label}</small><b>{String(value)}</b></div>)}</div> : <p>No camera metadata was found in this still image. Try an original camera file or an accompanying metadata sidecar; missing values are not inferred.</p>}
                   <div className="camera-metadata-tools"><button type="button" className="profile-select-button" disabled={!capture.camera_make && !capture.camera_model && !capture.color_transfer && !capture.color_primaries} onClick={() => void matchDetectedCapture()}>Match camera profile from metadata</button><span>Only embedded/reported metadata is shown. A Log label alone does not validate the image transform.</span></div>
+                  <label className="camera-sidecar-picker">CAMERA XML SIDECAR (OPTIONAL)<input type="file" accept=".xml,text/xml,application/xml" onChange={async event => {
+                    const sidecar = event.target.files?.[0];
+                    if (!sidecar) { setSidecarMetadata({}); return; }
+                    try {
+                      const source = await sidecar.text();
+                      const document = new DOMParser().parseFromString(source, "application/xml");
+                      if (document.querySelector("parsererror")) throw new Error("Invalid XML sidecar.");
+                      const extracted: Record<string, string> = {};
+                      document.querySelectorAll("*").forEach(node => {
+                        const value = (node.textContent || "").trim();
+                        if (value && value.length < 500 && node.children.length === 0) extracted[node.tagName.split(":").pop() || node.tagName] = value;
+                        Array.from(node.attributes).forEach(attribute => { extracted[node.tagName + "@" + attribute.name] = attribute.value; });
+                      });
+                      setSidecarMetadata(extracted);
+                    } catch (error) { setSidecarMetadata({ "Sidecar error": error instanceof Error ? error.message : "Could not read XML." }); }
+                  }} /><span>Attach Sony / camera XML metadata without treating it as proof of pixel encoding.</span></label>
+                  {Object.keys(sidecarMetadata).length > 0 && <details open><summary>XML sidecar metadata · {Object.keys(sidecarMetadata).length} fields</summary><div className="camera-metadata-grid">{Object.entries(sidecarMetadata).map(([key, value]) => <div key={key}><small>{key}</small><b>{value}</b></div>)}</div></details>}
                   {Object.keys(capture).length > 0 && <details><summary>View complete extracted capture metadata</summary><pre>{JSON.stringify(capture, null, 2)}</pre></details>}
                 </section>;
               })()}
