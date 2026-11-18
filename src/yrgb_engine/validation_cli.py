@@ -39,7 +39,7 @@ def main() -> int:
     audit = result.to_registry_record()
     rendered = json.dumps(audit, indent=2, ensure_ascii=False)
     if args.output:
-        Path(args.output).write_text(rendered + "\\n", encoding="utf-8")
+        Path(args.output).write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
     return 0 if result.passed else 2
 
