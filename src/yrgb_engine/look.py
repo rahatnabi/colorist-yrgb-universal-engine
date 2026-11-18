@@ -201,7 +201,8 @@ def apply_look_to_declared_linear_frame(
     """Apply a look when the operator explicitly attests the source is linear.
 
     Unlike apply_look_to_frame, this path does not mark the frame or transform
-    as validated. It is suitable for scene-linear float interchange only.
+    as validated. It is suitable for scene-linear float interchange only. The
+    operator's attestation is not independently verified by the decoder.
     """
     validate_look(settings)
     if not linear_input_confirmed:
