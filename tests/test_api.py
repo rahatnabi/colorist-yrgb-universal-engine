@@ -171,6 +171,11 @@ def test_video_sample_endpoint_analyzes_bounded_frames_and_cut_candidates(monkey
     assert len(payload["shot_groups"]) == 2
     assert payload["shot_groups"][1]["start_frame_index"] == 2
     assert payload["shot_groups"][1]["boundary_candidate"] is True
+    temporal = payload["temporal_diagnostics"]
+    assert temporal["measurement_domain"] == "nonlinear_rgb_code_values"
+    assert temporal["segments"][0]["interpretation"] == "insufficient_samples_for_trend"
+    assert temporal["flicker_assessment"]["status"] == "unavailable"
+    assert temporal["exposure_drift_assessment"]["status"] == "unavailable"
     assert payload["consistency_status"]["exposure_drift"].startswith("unavailable")
 
 
