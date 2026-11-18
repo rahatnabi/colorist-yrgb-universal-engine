@@ -16,7 +16,10 @@
         "Sony FX9",
         "FX3",
         "FX6",
-        "FX9"
+        "FX9",
+        "ILME-FX30",
+        "Sony FX30",
+        "FX30"
       ],
       "encoding": "S-Log3",
       "gamut": "S-Gamut3.Cine",
