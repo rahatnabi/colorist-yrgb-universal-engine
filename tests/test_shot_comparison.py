@@ -34,4 +34,5 @@ def test_feature_alignment_registers_translated_and_rotated_still():
     assert result["alignment"]["inlier_ratio"] >= 0.15
     assert result["alignment"]["overlap_ratio"] > 0.5
     assert result["comparison"]["sample_domain_match"] is True
+    assert result["alignment_preview_data_url"].startswith("data:image/jpeg;base64,")
     assert result["comparison"]["measurement_domain"] == "aligned_decoded_rgb_sample_values"
