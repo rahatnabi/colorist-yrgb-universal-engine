@@ -1243,3 +1243,107 @@ def test_native_grade_export_requires_complete_delivery_qc_roi():
     )
     assert response.status_code == 422
     assert "x, y, width and height together" in response.json()["detail"]
+
+
+def test_native_grade_export_runs_delivery_qc_on_decoded_master(tmp_path, monkeypatch):
+    import base64
+    import hashlib
+    import json
+    from dataclasses import dataclass
+    from pathlib import Path
+    from types import SimpleNamespace
+    from yrgb_engine.precision import ColorEncoding, PrecisionFrame
+
+    config = tmp_path / "qc-pinned.ocio"
+    config.write_text("qc-pinned-config")
+    profile_id = "test.delivery.qc"
+    transform_id = "test.delivery.transform"
+    working_space = "Linear DaVinci WideGamut"
+    registry = ProfileRegistry([{
+        "id": profile_id, "manufacturer": "Test", "encoding": "Test Log",
+        "gamut": "Test Gamut", "status": "verified", "transform_id": transform_id,
+        "ocio_source_space": "Test Log", "ocio_destination_space": working_space,
+        "output_transfer": "Linear", "output_primaries": "DaVinci Wide Gamut",
+        "validation": {
+            "passed": True, "profile_id": profile_id, "transform_id": transform_id,
+            "source_space": "Test Log", "destination_space": working_space,
+            "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+            "reference_set_id": "qc-reference-set", "vector_count": 12,
+            "max_absolute_error": 0.00001, "tolerance": 0.0001, "ocio_version": "test",
+        },
+    }])
+    source = PrecisionFrame.from_interleaved(
+        width=4, height=4, channel_names=("R", "G", "B"),
+        values=[0.18, 0.18, 0.18] * 16,
+        source_path="source", decoder="test", encoding=ColorEncoding(),
+    )
+    graded = PrecisionFrame.from_interleaved(
+        width=4, height=4, channel_names=("R", "G", "B"),
+        values=[0.18, 0.18, 0.18] * 16,
+        source_path="graded", decoder="test",
+        encoding=ColorEncoding(
+            primaries="DaVinci Wide Gamut", transfer="Linear",
+            profile_id=profile_id, validated=True,
+            working_space_id=working_space, transform_id=transform_id,
+        ),
+        sample_domain="validated_linear_native_grade_float32",
+        purpose="graded_still_candidate",
+    )
+    decoded_calls = {"count": 0}
+    def fake_decode(_path):
+        decoded_calls["count"] += 1
+        return source if decoded_calls["count"] == 1 else graded
+    monkeypatch.setattr("yrgb_engine.oiio_decoder.decode_oiio_float", fake_decode)
+    monkeypatch.setattr(
+        "yrgb_engine.grading_pipeline.process_validated_still",
+        lambda *_args, **_kwargs: SimpleNamespace(graded_frame=graded),
+    )
+    def fake_writer(_frame, path):
+        Path(path).write_bytes(b"verified-float-master")
+        return Path(path)
+    monkeypatch.setattr("yrgb_engine.native_export.save_native_float_image", fake_writer)
+    monkeypatch.setattr(
+        "yrgb_engine.native_export.verify_native_float_export",
+        lambda *_args, **_kwargs: {
+            "verified": True, "sample_count": 48, "mismatch_count": 0,
+            "max_absolute_error": 0.0, "rmse": 0.0,
+            "sample_sha256_matches": True, "sample_sha256": "fixture",
+        },
+    )
+    seen = {}
+    def fake_measure(frame, region, target):
+        seen["frame"] = frame
+        seen["region"] = region
+        seen["target"] = target
+        return object()
+    monkeypatch.setattr("yrgb_engine.accuracy.measure_correction_accuracy", fake_measure)
+    @dataclass
+    class FakeReport:
+        status: str = "scored"
+        score: float = 95.0
+    monkeypatch.setattr(
+        "yrgb_engine.correction_report.build_correction_accuracy_report",
+        lambda *_args, **_kwargs: FakeReport(),
+    )
+    monkeypatch.setenv("YRGB_OCIO_CONFIG", str(config))
+    client = TestClient(create_app(registry=registry))
+    response = client.post(
+        "/v1/media/native-grade-export",
+        data={
+            "profile_id": profile_id, "export_format": "exr",
+            "roi_x": "0", "roi_y": "0", "roi_width": "4", "roi_height": "4",
+        },
+        files={"file": ("still.tif", b"fixture", "image/tiff")},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["x-yrgb-delivery-qc-status"] == "scored"
+    assert response.headers["x-yrgb-correction-accuracy-score"] == "95.0"
+    payload = json.loads(base64.urlsafe_b64decode(
+        response.headers["x-yrgb-delivery-qc-report"].encode("ascii")
+    ))
+    assert payload["status"] == "scored"
+    assert payload["score"] == 95.0
+    assert decoded_calls["count"] == 2
+    assert seen["frame"].encoding.transform_id == transform_id
+    assert seen["frame"].metadata["yrgb_roundtrip_verified"] is True
+    assert (seen["region"].x, seen["region"].y, seen["region"].width, seen["region"].height) == (0, 0, 4, 4)
