@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from yrgb_engine.accuracy import AccuracyTarget, measure_correction_accuracy
@@ -22,7 +24,6 @@ def test_reference_tonal_curve_exact_match_is_integrated_into_correction_score()
     levels = [0.01, 0.03, 0.07, 0.18, 0.32, 0.55, 0.85]
     baseline = measure_reference_tonal_curve(frame(neutral_pixels(levels)), ReferenceTonalCurve(tuple([0.01, 0.03, 0.07, 0.18, 0.32, 0.55, 0.85])))
     reference = ReferenceTonalCurve(baseline.candidate_luminance, tolerance_stops=0.1)
-    import math
     exposure_target = math.log2((sum(levels) / len(levels)) / 0.18)
     result = measure_correction_accuracy(
         frame(neutral_pixels(levels)), PixelRegion(0, 0, 7, 1),
