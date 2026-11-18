@@ -47,3 +47,13 @@ After writing a TIFF or OpenEXR master, the engine reopens the file with OpenIma
 Defaults are absolute tolerance `1e-7` and relative tolerance `1e-6`. An export that exceeds tolerance is rejected and is not returned as a successful master. The API reports sample count, maximum absolute error, RMSE and whether the read-back sample digest matches the in-memory float32 frame.
 
 This verifies the actual output file rather than merely trusting the writer call. It does not certify colorimetric correctness of the camera input transform or the monitor/display transform; those remain separate validation responsibilities.
+
+## Post-export delivery QC
+
+The export endpoint accepts an optional full-resolution pixel ROI (`roi_x`, `roi_y`, `roi_width`, `roi_height`). Supply all four values together; the region must be inside the exported still and contain at least 16 pixels.
+
+When an ROI is supplied, the engine first writes the master, reopens it and verifies every float32 sample against the in-memory graded frame. Only after that succeeds does it decode the actual exported file again, confirm dimensions and channel layout, and carry the already-validated pipeline identity onto that decoded frame. Correction Accuracy is then measured from the decoded export—not from the browser preview or an assumed display transform.
+
+The optional exercise target includes exposure target stops and the linear gray reference (default 18%). The report is returned in the `X-YRGB-Delivery-QC-Report` response header (URL-safe base64-encoded JSON), with the overall Correction Accuracy score and QC status in separate headers. If no ROI is provided, export remains available and QC is explicitly marked `not_requested`.
+
+The ROI must genuinely represent a neutral reference for exposure and white-balance measurements to be meaningful. The engine does not infer neutrality from pixel values. A technically valid file round-trip is not proof that the camera transform itself is colorimetrically correct; transform validation remains a separate gate.
