@@ -65,14 +65,19 @@ def load_reference_manifest(path: str | Path) -> dict[str, Any]:
             "Reference manifest needs measured vectors; an empty template cannot validate a transform."
         )
     vectors: list[dict[str, Any]] = []
+    labels: set[str] = set()
     for index, item in enumerate(raw_vectors):
         if not isinstance(item, dict):
             raise ReferenceManifestError(f"Vector {index} must be an object.")
         label = item.get("label")
         if not isinstance(label, str) or not label.strip():
             raise ReferenceManifestError(f"Vector {index} requires a label.")
+        normalized_label = label.strip().casefold()
+        if normalized_label in labels:
+            raise ReferenceManifestError(f"Reference vector labels must be unique: {label!r}.")
+        labels.add(normalized_label)
         vectors.append({
-            "label": label,
+            "label": label.strip(),
             "source_rgb": _finite_rgb(item.get("source_rgb"), f"vectors[{index}].source_rgb"),
             "expected_rgb": _finite_rgb(item.get("expected_rgb"), f"vectors[{index}].expected_rgb"),
         })
@@ -94,6 +99,19 @@ def validate_reference_manifest(
         raise ReferenceManifestError("Manifest profile_id is not present in the camera registry.")
     if profile.get("status") == "deprecated":
         raise ReferenceManifestError("Deprecated camera profiles cannot be validated for production use.")
+
+    # A camera-specific registry entry must not accept a reference set from a
+    # different model merely because the Log/gamut label happens to match.
+    supported_models = profile.get("camera_models", [])
+    if supported_models and not any(
+        manifest["camera_model"].strip().casefold() == model.strip().casefold()
+        for model in supported_models
+        if isinstance(model, str)
+    ):
+        raise ReferenceManifestError(
+            "Manifest camera_model is not listed as compatible with the selected registry profile."
+        )
+
     expected = {
         "transform_id": profile.get("transform_id"),
         "source_space": profile.get("ocio_source_space"),
