@@ -163,3 +163,58 @@ def test_candidate_discovery_can_narrow_to_exact_profile_variant():
     )
     assert [item["id"] for item in candidates] == ["sony.slog3.sgamut3cine"]
     assert candidates[0]["selection_requirements"] == []
+
+
+def test_verified_profile_requires_reference_validation_record():
+    registry = ProfileRegistry([{
+        "id": "test.claimed.verified",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "camera_models": [],
+        "status": "verified",
+        "transform_id": "example.log-to-wide",
+    }])
+    profile = registry.get_by_id("test.claimed.verified")
+    assert profile["usable_for_transform"] is False
+    assert profile["validation_status"] == "not_reference_validated"
+
+
+def test_verified_profile_with_passing_reference_record_is_usable():
+    registry = ProfileRegistry([{
+        "id": "test.reference.validated",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "camera_models": [],
+        "status": "verified",
+        "transform_id": "example.log-to-wide",
+        "validation": {
+            "passed": True,
+            "config_sha256": "a" * 64,
+            "reference_set_id": "vendor-chart-v1",
+            "vector_count": 24,
+        },
+    }])
+    profile = registry.get_by_id("test.reference.validated")
+    assert profile["usable_for_transform"] is True
+    assert profile["validation_status"] == "reference_validated"
+
+
+def test_failed_reference_record_never_enables_profile():
+    registry = ProfileRegistry([{
+        "id": "test.reference.failed",
+        "manufacturer": "Example",
+        "encoding": "Log",
+        "gamut": "Wide",
+        "camera_models": [],
+        "status": "verified",
+        "transform_id": "example.log-to-wide",
+        "validation": {
+            "passed": False,
+            "config_sha256": "a" * 64,
+            "reference_set_id": "vendor-chart-v1",
+            "vector_count": 24,
+        },
+    }])
+    assert registry.get_by_id("test.reference.failed")["usable_for_transform"] is False
