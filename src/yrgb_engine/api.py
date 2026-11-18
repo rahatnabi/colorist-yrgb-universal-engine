@@ -189,6 +189,69 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
 
+    @app.post("/v1/media/video-frame")
+    async def media_video_frame(
+        file: UploadFile = File(...),
+        timestamp_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+    ) -> dict[str, Any]:
+        """Decode and analyze one video frame at an explicit timestamp.
+
+        The decoder preserves source transfer/primaries metadata and does not
+        apply a camera input transform or infer display-referred measurements.
+        """
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-video-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+            from .oiio_decoder import HighPrecisionDecodeError
+            from .video_precision import decode_video_float_frame
+
+            try:
+                frame = await run_in_threadpool(
+                    decode_video_float_frame, temporary_path, timestamp_seconds=timestamp_seconds
+                )
+            except HighPrecisionDecodeError as exc:
+                if "required" in str(exc).lower() or "install ffmpeg" in str(exc).lower():
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            result = await run_in_threadpool(
+                analyze_frame, frame, histogram_bins=128, scope_width=128,
+                scope_height=96, value_range=(0.0, 1.0),
+            )
+            return {
+                "filename": filename, "timestamp_seconds": timestamp_seconds,
+                "decoder": frame.decoder, "width": frame.width, "height": frame.height,
+                "sample_domain": frame.sample_domain, "encoding": asdict(frame.encoding),
+                "metadata": frame.metadata,
+                "analysis": {
+                    "channels": {key: asdict(value) for key, value in result.channels.items()},
+                    "histograms": {key: asdict(value) for key, value in result.histograms.items()},
+                    "rgb_parade": {key: asdict(value) for key, value in result.rgb_parade.items()},
+                    "waveform": None, "luminance": None, "vectorscope_points": None,
+                    "note": "Source sample-domain analysis only; no camera transform, IRE or luminance interpretation is inferred.",
+                },
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
     return app
 
 
