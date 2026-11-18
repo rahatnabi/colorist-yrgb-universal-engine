@@ -94,3 +94,17 @@ The first read-only learning API is available on the still-image product path:
 The catalogue currently defines nine lessons and three starter exercises. Exercise target values are instructional examples, not measured camera reference data. Learner progress persistence, downloadable practice stills and submission UI are not yet implemented.
 
 **Assessment remains split:** Correction Accuracy is an objective exercise-target technical measurement and stays NOT SCORED when validation evidence is missing. Creative Look Similarity is a separate perceptual comparison against a designated creative still. These scores are never combined.
+
+### Guided still-image learning
+
+The web workspace includes a **Learning School** view with lesson navigation, practical tasks, exercise submissions, a downloadable synthetic practice chart, and local learner progress/history.
+
+Learning API additions:
+- `GET /v1/learning/assets/neutral-practice-chart.png`
+- `POST /v1/learning/lessons/{lesson_id}/complete`
+- `GET /v1/learning/progress?learner_id=...`
+- `POST /v1/learning/submissions`
+
+Progress and submitted stills are stored locally under `YRGB_LEARNING_DATA_DIR` (default `~/.colorist-yrgb/learning`). This is a local single-instance store, not cloud sync or authenticated multi-user storage. Practical uploads are limited to 100 MiB.
+
+The downloadable chart is synthetic and instructional, never a measured camera reference. The current correction exercise therefore remains **NOT SCORED**. No Correction Accuracy score is issued until a future native assessment runner verifies the reference, transform and measurement evidence. Creative Look Similarity remains separate.
