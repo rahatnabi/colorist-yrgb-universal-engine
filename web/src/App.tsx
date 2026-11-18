@@ -161,6 +161,25 @@ export default function App() {
     } finally { setBusy(false); }
   }
 
+  async function refreshScopes(standard: "bt709" | "bt2020") {
+    if (!file || !apiOnline) return;
+    setBusy(true);
+    setAnalysisNote("Recalculating scopes with " + standard.toUpperCase() + " coefficients…");
+    try {
+      const body = new FormData(); body.append("file", file);
+      const endpoint = isVideo
+        ? API_BASE + "/v1/media/video-frame?timestamp_seconds=" + encodeURIComponent(frameTimestamp || "0") + "&scope_standard=" + standard
+        : API_BASE + "/v1/media/analyze?scope_standard=" + standard;
+      const response = await fetch(endpoint, { method: "POST", body });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Scope recalculation failed");
+      setAnalysis(data as AnalysisResponse);
+      setAnalysisNote("Scopes recalculated. " + standard.toUpperCase() + " coefficients are a manual assumption; source encoding is not certified.");
+    } catch (err) {
+      setAnalysisNote(err instanceof Error ? err.message : "Could not recalculate scopes");
+    } finally { setBusy(false); }
+  }
+
   async function matchDetectedCapture() {
     const capture = probe?.probe.metadata && typeof probe.probe.metadata === "object"
       ? (probe.probe.metadata as Record<string, unknown>).capture_metadata
@@ -422,7 +441,7 @@ export default function App() {
           </section>
         </div>
 
-        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => setScopeStandard(event.target.value as "bt709" | "bt2020")}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
+        <div className="section-header"><div><span className="section-kicker">SIGNAL MONITORING</span><h2>Scopes & Diagnostics</h2></div><div className="scope-toolbar"><label>MANUAL LUMA STANDARD<select value={scopeStandard} onChange={event => { const next = event.target.value as "bt709" | "bt2020"; setScopeStandard(next); void refreshScopes(next); }}><option value="bt709">BT.709</option><option value="bt2020">BT.2020</option></select></label><span className="subtle-tag">{analysis ? "ENGINE DECODED · SAMPLE DOMAIN" : "AWAITING DECODED FRAME"}</span></div></div>
         {analysisNote && <div className="analysis-note">{analysisNote}</div>}
         <div className="scope-grid-layout">
           <ScopePanel title="Luma Waveform" subtitle="Luma-weighted · manually selected coefficients · source sample values" icon={<Activity size={15} />} waveform={analysis?.analysis.waveform} />
