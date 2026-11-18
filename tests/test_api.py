@@ -165,6 +165,11 @@ def test_video_sample_endpoint_analyzes_bounded_frames_and_cut_candidates(monkey
     assert payload["frames"][2]["histogram_distance"] > 0.5
     assert payload["frames"][2]["shot_change_candidate"] is True
     assert payload["frames"][2]["mean_luminance_delta"] is None
+    assert [frame["shot_index"] for frame in payload["frames"]] == [0, 0, 1]
+    assert len(payload["shot_groups"]) == 2
+    assert payload["shot_groups"][1]["start_frame_index"] == 2
+    assert payload["shot_groups"][1]["boundary_candidate"] is True
+    assert payload["consistency_status"]["exposure_drift"].startswith("unavailable")
 
 
 def test_video_sample_endpoint_rejects_more_than_24_frames():
