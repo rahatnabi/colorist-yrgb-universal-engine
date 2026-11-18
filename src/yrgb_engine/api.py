@@ -252,6 +252,95 @@ def create_app(*, registry: ProfileRegistry | None = None) -> FastAPI:
             if temporary_path:
                 Path(temporary_path).unlink(missing_ok=True)
 
+    @app.post("/v1/media/video-sample")
+    async def media_video_sample(
+        file: UploadFile = File(...),
+        start_seconds: float = Query(default=0.0, ge=0.0, le=86400.0),
+        interval_seconds: float = Query(default=1.0, gt=0.0, le=60.0),
+        frame_count: int = Query(default=8, ge=1, le=24),
+        shot_change_threshold: float | None = Query(default=0.35, ge=0.0, le=1.0),
+    ) -> dict[str, Any]:
+        """Analyze a bounded set of evenly spaced video frames.
+
+        Shot-change flags are histogram-distance candidates, not semantic cuts.
+        Frames are decoded sequentially and are not retained after analysis.
+        """
+        filename = Path(file.filename or "upload.bin").name
+        suffix = Path(filename).suffix[:16]
+        temporary_path: str | None = None
+        total = 0
+        try:
+            with tempfile.NamedTemporaryFile(prefix="yrgb-sample-", suffix=suffix, delete=False) as temp:
+                temporary_path = temp.name
+                while chunk := await file.read(CHUNK_BYTES):
+                    total += len(chunk)
+                    if total > MAX_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Upload exceeds {MAX_UPLOAD_BYTES} byte limit.")
+                    temp.write(chunk)
+            if total == 0:
+                raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+            from .oiio_decoder import HighPrecisionDecodeError
+            from .video_precision import decode_video_float_frame
+            from .timeline import iter_analyze_video_frames
+
+            def analyze_sample() -> list[dict[str, Any]]:
+                def decoded_frames():
+                    for index in range(frame_count):
+                        timestamp = start_seconds + index * interval_seconds
+                        frame = decode_video_float_frame(temporary_path, timestamp_seconds=timestamp)
+                        yield timestamp, frame
+
+                reports = iter_analyze_video_frames(
+                    decoded_frames(),
+                    shot_change_threshold=shot_change_threshold,
+                    analysis_options={
+                        "histogram_bins": 128,
+                        "scope_width": 128,
+                        "scope_height": 96,
+                        "value_range": (0.0, 1.0),
+                    },
+                )
+                output = []
+                for report in reports:
+                    output.append({
+                        "timestamp_seconds": report.timestamp_seconds,
+                        "frame_index": report.frame_index,
+                        "histogram_distance": report.histogram_distance,
+                        "channel_mean_delta": report.channel_mean_delta,
+                        "mean_luminance_delta": report.mean_luminance_delta,
+                        "shot_change_candidate": report.shot_change_candidate,
+                        "channels": {key: asdict(value) for key, value in report.analysis.channels.items()},
+                    })
+                return output
+
+            try:
+                frames = await run_in_threadpool(analyze_sample)
+            except HighPrecisionDecodeError as exc:
+                if "required" in str(exc).lower() or "install ffmpeg" in str(exc).lower():
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+            return {
+                "filename": filename,
+                "decoder": "FFmpeg/gbrpf32le",
+                "frame_count": len(frames),
+                "start_seconds": start_seconds,
+                "interval_seconds": interval_seconds,
+                "shot_change_threshold": shot_change_threshold,
+                "sample_domain": "source sample-domain; no input transform applied",
+                "frames": frames,
+                "note": "Histogram distance is a distribution-change candidate, not a semantic cut detector. Channel mean deltas are sample-domain values, not exposure stops.",
+            }
+        except HTTPException:
+            raise
+        except (OSError, ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            await file.close()
+            if temporary_path:
+                Path(temporary_path).unlink(missing_ok=True)
+
     return app
 
 
