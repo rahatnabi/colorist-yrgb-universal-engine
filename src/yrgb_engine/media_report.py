@@ -5,7 +5,6 @@ light or treating container color tags as proof of camera acquisition encoding.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from .analysis import analyze_frame
