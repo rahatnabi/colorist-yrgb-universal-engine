@@ -80,11 +80,30 @@ class ProfileRegistry:
     @staticmethod
     def _resolved_record(profile: dict[str, Any]) -> dict[str, Any]:
         record = deepcopy(profile)
-        usable = record.get("status") == "verified" and bool(record.get("transform_id"))
+        validation = record.get("validation")
+        has_validation = (
+            isinstance(validation, dict)
+            and validation.get("passed") is True
+            and isinstance(validation.get("config_sha256"), str)
+            and len(validation["config_sha256"]) == 64
+            and isinstance(validation.get("reference_set_id"), str)
+            and bool(validation["reference_set_id"].strip())
+            and isinstance(validation.get("vector_count"), int)
+            and validation["vector_count"] > 0
+        )
+        usable = (
+            record.get("status") == "verified"
+            and bool(record.get("transform_id"))
+            and has_validation
+        )
         record["usable_for_transform"] = usable
+        record["validation_status"] = (
+            "reference_validated" if has_validation else "not_reference_validated"
+        )
         if not usable:
             record["resolution_note"] = (
-                "Profile is catalogued but its transform is not verified."
+                "Profile requires verified status, transform_id, and a passing "
+                "reference-validation record before it can drive a transform."
             )
         return record
 
